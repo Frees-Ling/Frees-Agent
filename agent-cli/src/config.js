@@ -3,17 +3,17 @@ import os from 'node:os';
 import path from 'node:path';
 
 const DEFAULT_CONFIG = {
-  defaultProvider: 'ollama',
-  defaultModel: 'qwen2.5-coder:7b',
+  defaultProvider: 'openai-compatible',
+  defaultModel: 'qwen/qwen3.5-9b',
   providers: {
     ollama: {
       baseUrl: 'http://127.0.0.1:11434',
       model: 'qwen2.5-coder:7b'
     },
     'openai-compatible': {
-      baseUrl: 'https://api.openai.com/v1',
+      baseUrl: 'http://127.0.0.1:1234/v1',
       apiKeyEnv: 'OPENAI_API_KEY',
-      model: 'gpt-4.1-mini'
+      model: 'qwen/qwen3.5-9b'
     },
     anthropic: {
       baseUrl: 'https://api.anthropic.com',
