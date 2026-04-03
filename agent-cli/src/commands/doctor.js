@@ -1,9 +1,11 @@
 import path from 'node:path';
 import { createModelClient } from '../model/index.js';
+import { printFreesAgentBanner } from '../ui/banner.js';
 import { scanWorkspace } from '../workspace/indexer.js';
 
 export async function runDoctorCommand(options) {
   const { client, runtime } = await createModelClient(options);
+  printFreesAgentBanner(runtime, { command: 'doctor' });
   console.log(`config: ${runtime.configPath}`);
   console.log(`provider: ${runtime.providerName}`);
   console.log(`model: ${runtime.model}`);

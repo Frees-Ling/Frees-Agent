@@ -71,6 +71,12 @@ const DEFAULT_CONFIG = {
     summarizeAfterMessages: 18,
     maxSummaryChars: 6000,
     defaultSessionName: 'default'
+  },
+  systemIntegration: {
+    computerControl: false,
+    requiresManualApproval: true,
+    shellExecution: false,
+    accessibilityGuidedSetup: true
   }
 };
 

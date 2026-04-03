@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { buildCompletionPrompt, COMPLETE_SYSTEM_PROMPT } from '../agent/prompts.js';
 import { createModelClient } from '../model/index.js';
+import { printFreesAgentBanner } from '../ui/banner.js';
 import { readIndexedFile } from '../workspace/queries.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
 
@@ -14,6 +15,7 @@ export async function runCompleteCommand(options) {
 
   const workspaceRoot = path.resolve(options.workspace);
   const { client, runtime } = await createModelClient(options);
+  printFreesAgentBanner(runtime, { command: 'complete' });
   const index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
   const relevantFiles = findRelevantFiles(index, `${options.instruction} ${options.file || ''}`);
   let fileContext = '';

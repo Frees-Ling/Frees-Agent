@@ -6,6 +6,7 @@ import { runDocsCommand } from './commands/docs.js';
 import { runDoctorCommand } from './commands/doctor.js';
 import { runEditCommand } from './commands/edit.js';
 import { runMemoryCommand } from './commands/memory.js';
+import { runPermissionsCommand } from './commands/permissions.js';
 
 const HELP_TEXT = `
 Frees Agent
@@ -19,6 +20,8 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
 - Windows 与 macOS 平台运行
 - 持久化记忆、用户画像和超长对话摘要压缩
 - 内置中文文档区，可直接查看 LLM/训练/API 接入说明
+- 加载成功后显示 Frees Agent 特色横幅
+- 提供系统权限与电脑控制引导
 
 命令：
   frees-agent chat [workspace] [--message "..."]
@@ -29,6 +32,7 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
   frees-agent config show
   frees-agent memory show|clear|sessions
   frees-agent docs [topic]
+  frees-agent permissions
 
 通用参数：
   --provider anthropic|ollama|openai-compatible
@@ -313,6 +317,11 @@ export async function main(argv = process.argv.slice(2)) {
     await runDocsCommand({
       topic: parsed.positionals[0]
     });
+    return;
+  }
+
+  if (command === 'permissions') {
+    await runPermissionsCommand();
     return;
   }
 

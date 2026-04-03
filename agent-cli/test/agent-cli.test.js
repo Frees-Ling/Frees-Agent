@@ -10,6 +10,7 @@ import {
   updateMemoryAfterTurn
 } from '../src/memory/manager.js';
 import { createMemoryStore, loadMemoryState } from '../src/memory/store.js';
+import { buildPermissionGuide } from '../src/system/permissions.js';
 import { extractFirstJsonObject } from '../src/utils/json.js';
 import {
   buildWorkspaceOverview,
@@ -220,4 +221,11 @@ test('chat system prompt includes memory context', async () => {
   assert.match(prompt, /用户画像/);
   assert.match(prompt, /长期记忆/);
   assert.match(prompt, /长对话摘要/);
+});
+
+test('permission guide returns platform-aware content', () => {
+  const guide = buildPermissionGuide();
+  assert.ok(guide.platform);
+  assert.ok(Array.isArray(guide.steps));
+  assert.ok(guide.steps.length >= 1);
 });

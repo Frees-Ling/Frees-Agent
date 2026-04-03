@@ -10,11 +10,13 @@ import {
 } from '../memory/manager.js';
 import { createMemoryStore, getRecentMessagesForModel, loadMemoryState, saveMemoryState } from '../memory/store.js';
 import { createModelClient } from '../model/index.js';
+import { printFreesAgentBanner } from '../ui/banner.js';
 import { runEditCommand } from './edit.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
 
 export async function runChatCommand(options) {
   const { client, runtime } = await createModelClient(options);
+  printFreesAgentBanner(runtime, { command: 'chat' });
   let index = null;
   let workspaceOverview = '未指定工作区。';
   let workspaceRoot = null;

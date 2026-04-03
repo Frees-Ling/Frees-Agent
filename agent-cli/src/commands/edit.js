@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { createModelClient } from '../model/index.js';
+import { printFreesAgentBanner } from '../ui/banner.js';
 import { runEditAgent } from '../agent/edit-loop.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
 
@@ -13,6 +14,7 @@ export async function runEditCommand(options) {
 
   const workspaceRoot = path.resolve(options.workspace);
   const { client, runtime } = await createModelClient(options);
+  printFreesAgentBanner(runtime, { command: 'edit' });
   const index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
   const workspaceOverview = buildWorkspaceOverview(index);
   const relevantFiles = findRelevantFiles(index, options.task);

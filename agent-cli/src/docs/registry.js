@@ -44,6 +44,26 @@ export const DOCS = [
     slug: 'memory-long-chat',
     title: 'Frees Agent 的记忆系统与超长对话',
     filename: '07-Frees-Agent记忆与超长对话.md'
+  },
+  {
+    slug: 'datasets',
+    title: '数据集构建、清洗、标注与评测',
+    filename: '08-数据集构建清洗标注与评测.md'
+  },
+  {
+    slug: 'model-apps',
+    title: '模型应用、产品化与落地路线图',
+    filename: '09-模型应用产品化与落地路线图.md'
+  },
+  {
+    slug: 'permissions',
+    title: '系统权限、电脑控制与安全边界',
+    filename: '10-系统权限电脑控制与安全边界.md'
+  },
+  {
+    slug: 'load-model-step-by-step',
+    title: '手把手把模型加载到 Frees Agent',
+    filename: '11-手把手把模型加载到Frees-Agent.md'
   }
 ];
 

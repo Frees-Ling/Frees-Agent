@@ -18,6 +18,14 @@
   如何在 `Frees Agent` 里配置本地模型、OpenAI 兼容 API、Anthropic API，以及如何在代码里增加新的 provider。
 - `07-Frees-Agent记忆与超长对话.md`
   `Frees Agent` 的长期记忆、用户画像、会话持久化和超长对话摘要压缩机制。
+- `08-数据集构建清洗标注与评测.md`
+  如何做数据集、清洗、标注和评测。
+- `09-模型应用产品化与落地路线图.md`
+  如何从模型走向产品和系统工程。
+- `10-系统权限电脑控制与安全边界.md`
+  电脑控制、系统权限、辅助功能、PowerShell 策略等说明。
+- `11-手把手把模型加载到Frees-Agent.md`
+  这是第一次上手最推荐看的文档，按步骤教你把模型接到 Frees Agent。
 
 ## 推荐阅读顺序
 
@@ -35,4 +43,6 @@ frees-agent docs
 frees-agent docs llm-basics
 frees-agent docs load-models
 frees-agent docs memory-long-chat
+frees-agent docs load-model-step-by-step
+frees-agent permissions
 ```
