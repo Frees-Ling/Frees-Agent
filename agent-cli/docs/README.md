@@ -32,6 +32,8 @@
   项目目录和分层说明。
 - `14-Skill文件支持与编写说明.md`
   Skill 文件支持、目录约定和编写方式。
+- `15-Frees-Agent项目源码逐文件逐函数剖析.md`
+  项目级源码分析、逐文件职责、逐函数职责、算法和优化方向。
 
 ## 推荐阅读顺序
 
@@ -54,6 +56,7 @@ frees-agent docs datasets
 frees-agent docs permissions
 frees-agent docs 12-如何拓展开发Frees-Agent
 frees-agent docs skills
+frees-agent docs source-analysis
 frees-agent permissions
 frees-agent skills
 ```

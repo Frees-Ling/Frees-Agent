@@ -79,6 +79,11 @@ export const DOCS = [
     slug: 'skills',
     title: 'Skill 文件支持与编写说明',
     filename: '14-Skill文件支持与编写说明.md'
+  },
+  {
+    slug: 'source-analysis',
+    title: 'Frees Agent 项目源码逐文件逐函数剖析',
+    filename: '15-Frees-Agent项目源码逐文件逐函数剖析.md'
   }
 ];
 
