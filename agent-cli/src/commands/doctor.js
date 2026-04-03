@@ -7,6 +7,7 @@ export async function runDoctorCommand(options) {
   const { client, runtime } = await createModelClient(options);
   printFreesAgentBanner(runtime, { command: 'doctor' });
   console.log(`config: ${runtime.configPath}`);
+  console.log(`storageRoot: ${path.dirname(runtime.configPath)}`);
   console.log(`provider: ${runtime.providerName}`);
   console.log(`model: ${runtime.model}`);
   console.log(`baseUrl: ${runtime.baseUrl}`);
@@ -26,15 +27,13 @@ export async function runDoctorCommand(options) {
   console.log(`- keep recent messages: ${runtime.config.conversation?.keepRecentMessages}`);
   console.log(`- summarize after messages: ${runtime.config.conversation?.summarizeAfterMessages}`);
 
-  if (options.workspace) {
-    const workspaceRoot = path.resolve(options.workspace);
-    const index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
-    console.log('\nWorkspace scan:');
-    console.log(`- root: ${workspaceRoot}`);
-    console.log(`- files: ${index.stats.totalFiles}`);
-    console.log(`- loaded: ${index.stats.loadedFiles}`);
-    console.log(`- skipped: ${index.stats.skippedFiles}`);
-  }
+  const workspaceRoot = path.resolve(options.workspace || process.cwd());
+  const index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
+  console.log('\nWorkspace scan:');
+  console.log(`- root: ${workspaceRoot}`);
+  console.log(`- files: ${index.stats.totalFiles}`);
+  console.log(`- loaded: ${index.stats.loadedFiles}`);
+  console.log(`- skipped: ${index.stats.skippedFiles}`);
 
   if (options.ping) {
     const reply = await client.generateText({

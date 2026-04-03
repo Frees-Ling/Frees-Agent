@@ -1,5 +1,4 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
 const DEFAULT_CONFIG = {
@@ -108,7 +107,11 @@ export function getDefaultConfig() {
 }
 
 export function getDefaultConfigPath() {
-  return path.join(os.homedir(), '.terminal-ai-agent', 'config.json');
+  const homeOverride = process.env.FREES_AGENT_HOME;
+  if (homeOverride) {
+    return path.join(path.resolve(homeOverride), 'config.json');
+  }
+  return path.resolve(process.cwd(), '.frees-agent', 'config.json');
 }
 
 export function getConfigPath(explicitPath) {

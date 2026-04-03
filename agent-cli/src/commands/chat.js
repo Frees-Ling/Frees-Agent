@@ -8,8 +8,10 @@ import {
   describeMemoryState,
   updateMemoryAfterTurn
 } from '../memory/manager.js';
+import { resolveLocalChatShortcut } from '../memory/heuristics.js';
 import { createMemoryStore, getRecentMessagesForModel, loadMemoryState, saveMemoryState } from '../memory/store.js';
 import { createModelClient } from '../model/index.js';
+import { formatSkillContext, loadSkills, selectRelevantSkills } from '../skills/loader.js';
 import { printFreesAgentBanner } from '../ui/banner.js';
 import { runEditCommand } from './edit.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
@@ -17,17 +19,19 @@ import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../wor
 export async function runChatCommand(options) {
   const { client, runtime } = await createModelClient(options);
   printFreesAgentBanner(runtime, { command: 'chat' });
+  let workspaceRoot = path.resolve(options.workspace || process.cwd());
   let index = null;
   let workspaceOverview = '未指定工作区。';
-  let workspaceRoot = null;
+  let availableSkills = [];
 
-  if (options.workspace) {
-    workspaceRoot = path.resolve(options.workspace);
-    index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
-    workspaceOverview = buildWorkspaceOverview(index);
-    console.log(
-      `[chat] workspace indexed: ${index.stats.loadedFiles}/${index.stats.totalFiles} files`
-    );
+  index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
+  workspaceOverview = buildWorkspaceOverview(index);
+  availableSkills = await loadSkills(workspaceRoot);
+  console.log(
+    `[chat] workspace indexed: ${index.stats.loadedFiles}/${index.stats.totalFiles} files`
+  );
+  if (availableSkills.length) {
+    console.log(`[chat] loaded skills: ${availableSkills.length}`);
   }
 
   const memoryStore = await createMemoryStore({
@@ -45,11 +49,27 @@ export async function runChatCommand(options) {
   }
 
   async function askModel(message) {
+    const shortcutReply = resolveLocalChatShortcut(message, memoryState);
+    if (shortcutReply) {
+      await updateMemoryAfterTurn({
+        client,
+        state: memoryState,
+        userMessage: message,
+        assistantMessage: shortcutReply,
+        config: runtime.config
+      });
+      return shortcutReply;
+    }
+
     const relevantFiles = index ? findRelevantFiles(index, message) : [];
+    const relevantSkills = availableSkills.length
+      ? selectRelevantSkills(availableSkills, message)
+      : [];
     const prompt = buildChatUserPrompt({
       message,
       workspaceOverview,
-      relevantFiles
+      relevantFiles,
+      skillContext: formatSkillContext(relevantSkills)
     });
     const systemPrompt = buildChatSystemPrompt({
       baseSystemPrompt: CHAT_SYSTEM_PROMPT,
@@ -114,6 +134,7 @@ export async function runChatCommand(options) {
         console.log('/memory     查看当前持久化记忆');
         console.log('/profile    查看当前用户画像');
         console.log('/summary    查看长对话摘要');
+        console.log('/skills     查看当前加载的 skill 文件');
         continue;
       }
 
@@ -132,13 +153,21 @@ export async function runChatCommand(options) {
         continue;
       }
 
-      if (line === '/reload') {
-        if (!workspaceRoot) {
-          console.log('当前没有工作区。可使用 frees-agent chat <workspace> 启动。');
-          continue;
+      if (line === '/skills') {
+        if (!availableSkills.length) {
+          console.log('当前工作区没有加载到 skill 文件。');
+        } else {
+          for (const skill of availableSkills) {
+            console.log(`- ${skill.slug}: ${skill.description}`);
+          }
         }
+        continue;
+      }
+
+      if (line === '/reload') {
         index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
         workspaceOverview = buildWorkspaceOverview(index);
+        availableSkills = await loadSkills(workspaceRoot);
         console.log(
           `[chat] workspace reloaded: ${index.stats.loadedFiles}/${index.stats.totalFiles} files`
         );

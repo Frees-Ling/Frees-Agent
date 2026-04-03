@@ -9,8 +9,10 @@ import {
   compactConversationIfNeeded,
   updateMemoryAfterTurn
 } from '../src/memory/manager.js';
+import { resolveLocalChatShortcut } from '../src/memory/heuristics.js';
 import { createMemoryStore, loadMemoryState } from '../src/memory/store.js';
 import { buildPermissionGuide } from '../src/system/permissions.js';
+import { loadSkills, selectRelevantSkills } from '../src/skills/loader.js';
 import { extractFirstJsonObject } from '../src/utils/json.js';
 import {
   buildWorkspaceOverview,
@@ -228,4 +230,29 @@ test('permission guide returns platform-aware content', () => {
   assert.ok(guide.platform);
   assert.ok(Array.isArray(guide.steps));
   assert.ok(guide.steps.length >= 1);
+});
+
+test('local chat shortcut remembers and returns user name', () => {
+  const reply = resolveLocalChatShortcut('我叫什么名字', {
+    profile: { name: 'Frees Ling' }
+  });
+  assert.equal(reply, '你叫 Frees Ling。');
+});
+
+test('skills loader reads SKILL.md files and matches relevant skills', async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'agent-cli-skills-'));
+  const skillDir = path.join(tempRoot, '.claude', 'skills', 'code-review');
+  await import('node:fs/promises').then(module =>
+    module.mkdir(skillDir, { recursive: true })
+  );
+  await writeFile(
+    path.join(skillDir, 'SKILL.md'),
+    `---\nname: Code Review\ndescription: Review code for bugs and missing tests.\nallowed-tools: Read, Grep\n---\n\n# Code Review\n`
+  );
+
+  const skills = await loadSkills(tempRoot);
+  assert.ok(skills.some(skill => skill.slug === 'code-review'));
+
+  const matched = selectRelevantSkills(skills, '请帮我 review 代码并找 bug');
+  assert.ok(matched.some(skill => skill.slug === 'code-review'));
 });

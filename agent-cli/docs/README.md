@@ -26,6 +26,12 @@
   电脑控制、系统权限、辅助功能、PowerShell 策略等说明。
 - `11-手把手把模型加载到Frees-Agent.md`
   这是第一次上手最推荐看的文档，按步骤教你把模型接到 Frees Agent。
+- `12-如何拓展开发Frees-Agent.md`
+  面向后续开发者的扩展指南。
+- `13-项目架构说明.md`
+  项目目录和分层说明。
+- `14-Skill文件支持与编写说明.md`
+  Skill 文件支持、目录约定和编写方式。
 
 ## 推荐阅读顺序
 
@@ -44,5 +50,10 @@ frees-agent docs llm-basics
 frees-agent docs load-models
 frees-agent docs memory-long-chat
 frees-agent docs load-model-step-by-step
+frees-agent docs datasets
+frees-agent docs permissions
+frees-agent docs 12-如何拓展开发Frees-Agent
+frees-agent docs skills
 frees-agent permissions
+frees-agent skills
 ```

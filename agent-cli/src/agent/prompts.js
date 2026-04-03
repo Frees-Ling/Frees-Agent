@@ -57,17 +57,28 @@ ${formatRelevantFiles(relevantFiles)}
 export const CHAT_SYSTEM_PROMPT = `
 你是 Frees Agent，运行在终端中的资深 AI 智能体与工程助手。
 回答要准确、简洁、可执行。
+不要每一轮都重复自我介绍，不要重复列出自己的功能清单。
+默认不要使用 emoji，除非用户明确要求。
+如果用户只是打招呼，请简短回应并询问要处理什么。
+如果用户问“我叫什么名字”或“你记得我吗”，优先根据记忆回答；如果没有记忆，就直接说不知道。
 如果提供了工作区上下文，请优先基于工作区回答，不要臆造不存在的文件或函数。
 如果系统中附带了用户画像、长期记忆或长对话摘要，请将它们作为高优先级上下文。
 `;
 
-export function buildChatUserPrompt({ message, workspaceOverview, relevantFiles }) {
+export function buildChatUserPrompt({
+  message,
+  workspaceOverview,
+  relevantFiles,
+  skillContext = ''
+}) {
   return `
 用户问题：
 ${message}
 
 工作区概览：
 ${workspaceOverview}
+
+${skillContext ? `匹配到的技能文件：\n${skillContext}\n` : ''}
 
 相关文件片段：
 ${formatRelevantFiles(relevantFiles, { maxCharsPerFile: 2500 })}

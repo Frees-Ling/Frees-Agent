@@ -64,6 +64,21 @@ export const DOCS = [
     slug: 'load-model-step-by-step',
     title: '手把手把模型加载到 Frees Agent',
     filename: '11-手把手把模型加载到Frees-Agent.md'
+  },
+  {
+    slug: 'extend-frees-agent',
+    title: '如何拓展开发 Frees Agent',
+    filename: '12-如何拓展开发Frees-Agent.md'
+  },
+  {
+    slug: 'architecture',
+    title: 'Frees Agent 项目架构说明',
+    filename: '13-项目架构说明.md'
+  },
+  {
+    slug: 'skills',
+    title: 'Skill 文件支持与编写说明',
+    filename: '14-Skill文件支持与编写说明.md'
   }
 ];
 

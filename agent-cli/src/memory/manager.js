@@ -1,4 +1,5 @@
 import { extractFirstJsonObject, truncateForModel } from '../utils/json.js';
+import { inferLocalMemory } from './heuristics.js';
 import {
   appendTurnToSession,
   getRecentMessagesForModel,
@@ -59,6 +60,7 @@ export async function updateMemoryAfterTurn({
   temperature = 0
 }) {
   appendTurnToSession(state, userMessage, assistantMessage);
+  mergeMemoryExtraction(state, inferLocalMemory(userMessage), config);
 
   if (config?.memory?.enabled === false || config?.memory?.autoExtract === false) {
     await saveMemoryState(state);
@@ -147,6 +149,12 @@ export async function compactConversationIfNeeded({
 
 export function describeMemoryState(state) {
   return {
+    storage: {
+      storageRoot: state.store.storageRoot,
+      profilePath: state.store.profilePath,
+      durableMemoryPath: state.store.durableMemoryPath,
+      sessionPath: state.store.sessionPath
+    },
     profile: state.profile,
     durableMemories: state.durableMemories,
     session: {

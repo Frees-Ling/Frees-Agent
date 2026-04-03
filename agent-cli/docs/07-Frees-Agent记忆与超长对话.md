@@ -97,13 +97,10 @@ frees-agent memory sessions
 
 默认情况下，记忆与会话数据会保存在配置目录下的：
 
-- `data/memory/`
-- `data/sessions/`
+- `.frees-agent/data/memory/`
+- `.frees-agent/data/sessions/`
 
-也就是：
-
-- `~/.terminal-ai-agent/data/memory/`
-- `~/.terminal-ai-agent/data/sessions/`
+也就是保存在当前项目目录内，本地落盘，不默认上传到云端。
 
 ## 7. 为什么这很重要
 

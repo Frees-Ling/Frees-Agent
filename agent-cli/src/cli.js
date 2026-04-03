@@ -7,6 +7,7 @@ import { runDoctorCommand } from './commands/doctor.js';
 import { runEditCommand } from './commands/edit.js';
 import { runMemoryCommand } from './commands/memory.js';
 import { runPermissionsCommand } from './commands/permissions.js';
+import { runSkillsCommand } from './commands/skills.js';
 
 const HELP_TEXT = `
 Frees Agent
@@ -22,6 +23,7 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
 - 内置中文文档区，可直接查看 LLM/训练/API 接入说明
 - 加载成功后显示 Frees Agent 特色横幅
 - 提供系统权限与电脑控制引导
+- 支持 skill 文件类型（SKILL.md）
 
 命令：
   frees-agent chat [workspace] [--message "..."]
@@ -33,6 +35,7 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
   frees-agent memory show|clear|sessions
   frees-agent docs [topic]
   frees-agent permissions
+  frees-agent skills [skill-name]
 
 通用参数：
   --provider anthropic|ollama|openai-compatible
@@ -322,6 +325,26 @@ export async function main(argv = process.argv.slice(2)) {
 
   if (command === 'permissions') {
     await runPermissionsCommand();
+    return;
+  }
+
+  if (command === 'skills') {
+    const parsed = parseArgs({
+      args: argv.slice(1),
+      allowPositionals: true,
+      options: {
+        workspace: { type: 'string', short: 'w' },
+        help: { type: 'boolean', short: 'h' }
+      }
+    });
+    if (parsed.values.help) {
+      printHelp();
+      return;
+    }
+    await runSkillsCommand({
+      workspace: parsed.values.workspace,
+      topic: parsed.positionals[0]
+    });
     return;
   }
 

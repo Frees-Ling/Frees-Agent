@@ -32,14 +32,24 @@
 - 支持 `openai-compatible`
 - 支持 `anthropic`
 - 支持本地模型和云端模型统一接入
+- 支持 LM Studio 本地 OpenAI 兼容接口
 
 ### 5. 文档中心能力
 
 - 内置中文文档区
 - 支持查看 LLM、训练、数据集、模型接入、权限、记忆与长对话等文档
 - 新增真正按步骤写的“手把手加载模型”文档
+- 新增扩展开发文档与架构说明
 
-### 6. 品牌展示与权限引导
+### 6. Skill 文件支持
+
+- 支持 `.claude/skills/<skill-name>/SKILL.md`
+- 支持列出工作区 skill
+- 支持在聊天中自动匹配相关 skill 并注入上下文
+- 仓库内已附带一个示例 skill：
+  `.claude/skills/frees-agent-maintainer/SKILL.md`
+
+### 7. 品牌展示与权限引导
 
 - 模型加载成功后显示 `Frees Agent` 横幅
 - 显示当前 provider、model、模式和能力状态
@@ -57,6 +67,7 @@ frees-agent memory show
 frees-agent docs
 frees-agent docs load-model-step-by-step
 frees-agent permissions
+frees-agent skills
 ```
 
 ## 推荐先看
@@ -68,3 +79,19 @@ frees-agent permissions
 如果你想看完整文档目录，再看：
 
 - `agent-cli/docs/README.md`
+
+## 本地存储位置
+
+默认情况下，`Frees Agent` 的配置、记忆和会话都保存在当前工作目录下：
+
+```text
+.frees-agent/
+```
+
+也就是完全本地存储，不会默认存到云端。
+
+如果你想改位置，可以设置环境变量：
+
+```bash
+FREES_AGENT_HOME=/your/path
+```

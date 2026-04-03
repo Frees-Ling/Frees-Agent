@@ -17,10 +17,13 @@
 
 ## 2. 如何在配置里切换模型
 
-配置文件默认位置：
+默认情况下，配置文件会写到当前工作目录下：
 
-- macOS/Linux: `~/.terminal-ai-agent/config.json`
-- Windows: 用户主目录下 `.terminal-ai-agent/config.json`
+- `.frees-agent/config.json`
+
+如果你想改位置，可以设置：
+
+- `FREES_AGENT_HOME`
 
 示例：
 
