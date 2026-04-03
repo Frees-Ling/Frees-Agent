@@ -19,6 +19,7 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
 - Agent 式自动代码编辑、生成与重构
 - 本地模型与云端 API 统一接入
 - Windows 与 macOS 平台运行
+- 聊天支持实时流式回复输出
 - 持久化记忆、用户画像和超长对话摘要压缩
 - 内置中文文档区，可直接查看 LLM/训练/API 接入说明
 - 加载成功后显示 Frees Agent 特色横幅
@@ -46,6 +47,7 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
   --config <path>
   --temperature <number>
   --max-output-tokens <number>
+  --stream / --no-stream
   --verbose
 `;
 
@@ -76,6 +78,8 @@ export async function main(argv = process.argv.slice(2)) {
         config: { type: 'string' },
         session: { type: 'string', short: 's' },
         'reset-session': { type: 'boolean' },
+        stream: { type: 'boolean' },
+        'no-stream': { type: 'boolean' },
         temperature: { type: 'string' },
         'max-output-tokens': { type: 'string' },
         verbose: { type: 'boolean' },
@@ -99,6 +103,12 @@ export async function main(argv = process.argv.slice(2)) {
       configPath: parsed.values.config,
       session: parsed.values.session,
       resetSession: Boolean(parsed.values['reset-session']),
+      stream:
+        parsed.values['no-stream'] === true
+          ? false
+          : parsed.values.stream === true
+            ? true
+            : undefined,
       temperature:
         parsed.values.temperature !== undefined
           ? Number(parsed.values.temperature)

@@ -83,6 +83,21 @@ frees-agent doctor --provider openai-compatible --base-url http://localhost:1234
 frees-agent chat . --provider openai-compatible --base-url http://localhost:1234/v1 --model 你的模型名
 ```
 
+现在 `Frees Agent` 默认会对支持的模型服务开启实时流式输出，所以你会看到模型一边生成一边在终端里打印，而不是整段生成完才一次性出现。
+
+如果你想临时关闭流式输出，可以这样：
+
+```bash
+frees-agent chat . --provider openai-compatible --base-url http://localhost:1234/v1 --model 你的模型名 --no-stream
+```
+
+进入聊天后也可以直接切换：
+
+```text
+/stream on
+/stream off
+```
+
 ### 第 7 步：开始代码 Agent
 
 ```bash

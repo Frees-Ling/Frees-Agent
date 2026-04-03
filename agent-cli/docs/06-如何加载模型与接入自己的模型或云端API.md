@@ -31,6 +31,9 @@
 {
   "defaultProvider": "ollama",
   "defaultModel": "qwen2.5-coder:7b",
+  "conversation": {
+    "streamResponses": true
+  },
   "providers": {
     "ollama": {
       "baseUrl": "http://127.0.0.1:11434",
@@ -80,6 +83,16 @@ frees-agent chat . \
   --provider openai-compatible \
   --base-url http://127.0.0.1:1234/v1 \
   --model your-model-name
+```
+
+如果后端支持流式返回，`Frees Agent` 会默认边生成边显示。想关闭可以加：
+
+```bash
+frees-agent chat . \
+  --provider openai-compatible \
+  --base-url http://127.0.0.1:1234/v1 \
+  --model your-model-name \
+  --no-stream
 ```
 
 ## 4. 如何加载多切割本地模型
@@ -143,6 +156,16 @@ export class MyProviderClient {
     // 在这里写你自己的 HTTP 请求逻辑
     return "your model output";
   }
+
+  async streamText({ systemPrompt, messages, temperature, maxOutputTokens, onToken }) {
+    // 如果你的 provider 支持流式输出，可以一边收到 token 一边调用 onToken(...)
+    // 最终仍然返回完整文本
+    let fullText = "";
+    const chunk = "your streamed token";
+    fullText += chunk;
+    await onToken?.(chunk);
+    return fullText;
+  }
 }
 ```
 
@@ -182,3 +205,4 @@ export class MyProviderClient {
 - 接云端模型
 - 接代理网关
 - 接自己封装的私有模型服务
+- 接支持实时流式输出的模型服务

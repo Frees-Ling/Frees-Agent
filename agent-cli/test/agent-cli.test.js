@@ -9,8 +9,8 @@ import {
   compactConversationIfNeeded,
   updateMemoryAfterTurn
 } from '../src/memory/manager.js';
-import { resolveLocalChatShortcut } from '../src/memory/heuristics.js';
-import { createMemoryStore, loadMemoryState } from '../src/memory/store.js';
+import { inferLocalMemory, resolveLocalChatShortcut } from '../src/memory/heuristics.js';
+import { createMemoryStore, loadMemoryState, mergeMemoryExtraction } from '../src/memory/store.js';
 import { buildPermissionGuide } from '../src/system/permissions.js';
 import { loadSkills, selectRelevantSkills } from '../src/skills/loader.js';
 import { extractFirstJsonObject } from '../src/utils/json.js';
@@ -20,6 +20,19 @@ import {
   scanWorkspace
 } from '../src/workspace/indexer.js';
 import { listFiles, readIndexedFile, searchText } from '../src/workspace/queries.js';
+import { OpenAICompatibleClient } from '../src/model/openai-compatible.js';
+import { OllamaClient } from '../src/model/ollama.js';
+
+function createChunkStream(chunks) {
+  return new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(new TextEncoder().encode(chunk));
+      }
+      controller.close();
+    }
+  });
+}
 
 test('extractFirstJsonObject reads fenced json', () => {
   const parsed = extractFirstJsonObject('```json\n{"type":"final","summary":"ok"}\n```');
@@ -239,6 +252,89 @@ test('local chat shortcut remembers and returns user name', () => {
   assert.equal(reply, '你叫 Frees Ling。');
 });
 
+test('name questions are not extracted as user names', () => {
+  const extraction = inferLocalMemory('你知道我叫什么名字吗');
+  assert.equal(extraction.profilePatch.name, undefined);
+});
+
+test('self introduction gets an immediate local reply', () => {
+  const reply = resolveLocalChatShortcut('我叫 Frees Ling，很高兴认识你！', {
+    profile: {}
+  });
+  assert.equal(reply, '你好，Frees Ling。很高兴认识你，我已经记住你的名字了。');
+});
+
+test('invalid extracted names are ignored during merge', () => {
+  const state = {
+    profile: {},
+    durableMemories: [],
+    session: {}
+  };
+
+  mergeMemoryExtraction(
+    state,
+    {
+      profilePatch: {
+        name: '什么名字吗'
+      }
+    },
+    {
+      memory: {
+        maxDurableMemories: 10
+      }
+    }
+  );
+
+  assert.equal(state.profile.name, undefined);
+  assert.equal(state.durableMemories.length, 0);
+});
+
+test('loading memory state sanitizes previously broken name data', async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'agent-cli-memory-sanitize-'));
+  const configPath = path.join(tempRoot, 'config.json');
+  await writeFile(configPath, '{}\n');
+
+  const store = await createMemoryStore({
+    configPath,
+    workspaceRoot: tempRoot,
+    sessionName: 'sanitize'
+  });
+
+  await writeFile(
+    store.profilePath,
+    `${JSON.stringify({ name: '什么名字吗', language: 'zh-CN' }, null, 2)}\n`
+  );
+  await writeFile(
+    store.durableMemoryPath,
+    `${JSON.stringify(
+      [
+        { category: 'profile', content: '用户的名字是 什么名字吗。' },
+        { category: 'goal', content: '用户想增强 Frees Agent。' }
+      ],
+      null,
+      2
+    )}\n`
+  );
+
+  const state = await loadMemoryState(store, {
+    memory: {
+      enabled: true,
+      autoExtract: true,
+      maxDurableMemories: 80
+    },
+    conversation: {
+      keepRecentMessages: 12,
+      summarizeAfterMessages: 18,
+      maxSummaryChars: 6000
+    }
+  });
+
+  assert.equal(state.profile.name, undefined);
+  assert.equal(state.profile.language, 'zh-CN');
+  assert.equal(state.durableMemories.length, 1);
+  assert.match(state.durableMemories[0].content, /增强 Frees Agent/);
+});
+
 test('skills loader reads SKILL.md files and matches relevant skills', async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'agent-cli-skills-'));
   const skillDir = path.join(tempRoot, '.claude', 'skills', 'code-review');
@@ -255,4 +351,82 @@ test('skills loader reads SKILL.md files and matches relevant skills', async () 
 
   const matched = selectRelevantSkills(skills, '请帮我 review 代码并找 bug');
   assert.ok(matched.some(skill => skill.slug === 'code-review'));
+});
+
+test('openai-compatible streamText emits incremental tokens', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () =>
+    new Response(
+      createChunkStream([
+        'data: {"choices":[{"delta":{"content":"你"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"好"}}]}\n\n',
+        'data: [DONE]\n\n'
+      ]),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream'
+        }
+      }
+    );
+
+  try {
+    const client = new OpenAICompatibleClient({
+      baseUrl: 'http://127.0.0.1:1234/v1',
+      model: 'demo-model'
+    });
+
+    let streamed = '';
+    const reply = await client.streamText({
+      systemPrompt: 'test',
+      messages: [{ role: 'user', content: 'hi' }],
+      onToken(token) {
+        streamed += token;
+      }
+    });
+
+    assert.equal(reply, '你好');
+    assert.equal(streamed, '你好');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('ollama streamText emits incremental tokens', async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async () =>
+    new Response(
+      createChunkStream([
+        '{"message":{"content":"Hel"}}\n',
+        '{"message":{"content":"lo"}}\n',
+        '{"done":true}\n'
+      ]),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'application/x-ndjson'
+        }
+      }
+    );
+
+  try {
+    const client = new OllamaClient({
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'demo-model'
+    });
+
+    let streamed = '';
+    const reply = await client.streamText({
+      systemPrompt: 'test',
+      messages: [{ role: 'user', content: 'hi' }],
+      onToken(token) {
+        streamed += token;
+      }
+    });
+
+    assert.equal(reply, 'Hello');
+    assert.equal(streamed, 'Hello');
+  } finally {
+    global.fetch = originalFetch;
+  }
 });

@@ -11,6 +11,8 @@ export const MEMORY_EXTRACT_SYSTEM_PROMPT = `
 3. 如果没有新增记忆，也必须返回合法 JSON。
 4. profilePatch 里只放用户画像相关字段。
 5. durableMemories 里放长期偏好、目标、约束、项目背景等。
+6. 提问句不是事实，例如“我叫什么名字”“你知道我是谁吗”不能被提取成 name。
+7. 绝对不要把“什么名字吗”“谁吗”这类疑问词写进 profilePatch.name。
 
 返回格式：
 {

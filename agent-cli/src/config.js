@@ -66,6 +66,7 @@ const DEFAULT_CONFIG = {
   },
   conversation: {
     persistSessions: true,
+    streamResponses: true,
     keepRecentMessages: 12,
     summarizeAfterMessages: 18,
     maxSummaryChars: 6000,

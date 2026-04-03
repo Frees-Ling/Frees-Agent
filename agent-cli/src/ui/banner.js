@@ -29,7 +29,7 @@ export function printFreesAgentBanner(runtime, options = {}) {
 
   const mode = options.command || 'chat';
   const capabilityLine = `Provider: ${runtime.providerName} | Model: ${runtime.model} | Mode: ${mode}`;
-  const features = `Features: Memory | Long Context | ${
+  const features = `Features: Streaming | Memory | Long Context | ${
     runtime.config?.systemIntegration?.computerControl
       ? 'Computer Control Enabled'
       : 'Computer Control Requires Manual Setup'

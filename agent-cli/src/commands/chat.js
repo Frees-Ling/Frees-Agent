@@ -19,6 +19,8 @@ import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../wor
 export async function runChatCommand(options) {
   const { client, runtime } = await createModelClient(options);
   printFreesAgentBanner(runtime, { command: 'chat' });
+  let streamResponses =
+    options.stream ?? runtime.config.conversation?.streamResponses ?? true;
   let workspaceRoot = path.resolve(options.workspace || process.cwd());
   let index = null;
   let workspaceOverview = '未指定工作区。';
@@ -58,7 +60,10 @@ export async function runChatCommand(options) {
         assistantMessage: shortcutReply,
         config: runtime.config
       });
-      return shortcutReply;
+      return {
+        reply: shortcutReply,
+        streamed: false
+      };
     }
 
     const relevantFiles = index ? findRelevantFiles(index, message) : [];
@@ -76,12 +81,28 @@ export async function runChatCommand(options) {
       state: memoryState,
       config: runtime.config
     });
-    const reply = await client.generateText({
+    const request = {
       systemPrompt,
       messages: [...getRecentMessagesForModel(memoryState), { role: 'user', content: prompt }],
       temperature: options.temperature,
       maxOutputTokens: options.maxOutputTokens
-    });
+    };
+    let reply = '';
+    let streamed = false;
+
+    if (streamResponses && typeof client.streamText === 'function') {
+      streamed = true;
+      reply = await client.streamText({
+        ...request,
+        onToken(chunk) {
+          output.write(chunk);
+        }
+      });
+      output.write('\n');
+    } else {
+      reply = await client.generateText(request);
+    }
+
     await updateMemoryAfterTurn({
       client,
       state: memoryState,
@@ -94,13 +115,18 @@ export async function runChatCommand(options) {
       state: memoryState,
       config: runtime.config
     });
-    return reply;
+    return {
+      reply,
+      streamed
+    };
   }
 
   if (options.message) {
     try {
-      const reply = await askModel(options.message);
-      console.log(reply);
+      const result = await askModel(options.message);
+      if (!result.streamed) {
+        console.log(result.reply);
+      }
     } catch (error) {
       console.log('');
       console.log('Frees Agent 当前无法完成对话。');
@@ -114,6 +140,7 @@ export async function runChatCommand(options) {
   console.log(`会话: ${memoryState.session.name} (${memoryState.session.id})`);
   console.log('输入 /help 查看命令，输入 /exit 退出。');
   console.log('如果对话失败，不要退出终端，直接看错误提示并按提示修复。');
+  console.log(`流式输出: ${streamResponses ? '开启' : '关闭'}`);
 
   try {
     while (true) {
@@ -135,6 +162,8 @@ export async function runChatCommand(options) {
         console.log('/profile    查看当前用户画像');
         console.log('/summary    查看长对话摘要');
         console.log('/skills     查看当前加载的 skill 文件');
+        console.log('/stream on  开启实时流式输出');
+        console.log('/stream off 关闭实时流式输出');
         continue;
       }
 
@@ -174,6 +203,18 @@ export async function runChatCommand(options) {
         continue;
       }
 
+      if (line === '/stream on') {
+        streamResponses = true;
+        console.log('已开启实时流式输出。');
+        continue;
+      }
+
+      if (line === '/stream off') {
+        streamResponses = false;
+        console.log('已关闭实时流式输出。');
+        continue;
+      }
+
       if (line.startsWith('/edit ')) {
         if (!workspaceRoot) {
           console.log('当前 chat 未绑定工作区，无法执行代码编辑。');
@@ -190,8 +231,12 @@ export async function runChatCommand(options) {
       }
 
       try {
-        const reply = await askModel(line);
-        console.log(`\n${reply}\n`);
+        const result = await askModel(line);
+        if (!result.streamed) {
+          console.log(`\n${result.reply}\n`);
+        } else {
+          console.log('');
+        }
       } catch (error) {
         console.log('');
         console.log('Frees Agent 当前无法完成这次对话。');

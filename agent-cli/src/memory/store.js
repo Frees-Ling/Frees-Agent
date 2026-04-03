@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { isLikelyValidName, sanitizeProfilePatch } from './heuristics.js';
 import { shortHash, slugify } from '../utils/slug.js';
 
 function isObject(value) {
@@ -30,6 +31,31 @@ function mergeProfile(base = {}, patch = {}) {
     next[key] = value;
   }
   return next;
+}
+
+function sanitizeDurableMemories(memories = []) {
+  if (!Array.isArray(memories)) {
+    return [];
+  }
+
+  return memories.filter(memory => {
+    const category = String(memory?.category || '').trim();
+    const content = String(memory?.content || '').trim();
+    if (!content) {
+      return false;
+    }
+
+    if (category !== 'profile') {
+      return true;
+    }
+
+    const match = content.match(/用户的名字是\s+(.+?)[。.!！]?$/);
+    if (!match?.[1]) {
+      return true;
+    }
+
+    return isLikelyValidName(match[1]);
+  });
 }
 
 async function readJson(filePath, fallback) {
@@ -82,8 +108,8 @@ export async function createMemoryStore({ configPath, workspaceRoot, sessionName
 }
 
 export async function loadMemoryState(store, config) {
-  const profile = await readJson(store.profilePath, {});
-  const durableMemories = await readJson(store.durableMemoryPath, []);
+  const profile = sanitizeProfilePatch(await readJson(store.profilePath, {}));
+  const durableMemories = sanitizeDurableMemories(await readJson(store.durableMemoryPath, []));
   const session = await readJson(store.sessionPath, {
     id: store.sessionId,
     name: store.sessionName,
@@ -106,6 +132,8 @@ export async function loadMemoryState(store, config) {
 
 export async function saveMemoryState(state) {
   state.session.updatedAt = new Date().toISOString();
+  state.profile = sanitizeProfilePatch(state.profile);
+  state.durableMemories = sanitizeDurableMemories(state.durableMemories);
   await writeJson(state.store.profilePath, state.profile);
   await writeJson(state.store.durableMemoryPath, state.durableMemories);
   await writeJson(state.store.sessionPath, state.session);
@@ -113,14 +141,14 @@ export async function saveMemoryState(state) {
 
 export function mergeMemoryExtraction(state, extraction, config) {
   if (extraction?.profilePatch) {
-    state.profile = mergeProfile(state.profile, extraction.profilePatch);
+    state.profile = mergeProfile(state.profile, sanitizeProfilePatch(extraction.profilePatch));
   }
 
   if (Array.isArray(extraction?.durableMemories)) {
     const seen = new Set(
       state.durableMemories.map(item => `${item.category}::${item.content}`)
     );
-    for (const memory of extraction.durableMemories) {
+    for (const memory of sanitizeDurableMemories(extraction.durableMemories)) {
       const content = String(memory?.content || '').trim();
       const category = String(memory?.category || 'profile').trim() || 'profile';
       if (!content) {
