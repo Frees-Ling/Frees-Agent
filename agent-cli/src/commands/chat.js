@@ -78,15 +78,22 @@ export async function runChatCommand(options) {
   }
 
   if (options.message) {
-    const reply = await askModel(options.message);
-    console.log(reply);
+    try {
+      const reply = await askModel(options.message);
+      console.log(reply);
+    } catch (error) {
+      console.log('');
+      console.log('Frees Agent 当前无法完成对话。');
+      console.log(error instanceof Error ? error.message : String(error));
+    }
     return;
   }
 
   const rl = readline.createInterface({ input, output });
-  console.log(`Frees Agent Chat 已启动。provider=${runtime.providerName} model=${runtime.model}`);
-  console.log(`session=${memoryState.session.name} id=${memoryState.session.id}`);
-  console.log('输入 /help 查看命令，/exit 退出。');
+  console.log(`Frees Agent Chat 已启动`);
+  console.log(`会话: ${memoryState.session.name} (${memoryState.session.id})`);
+  console.log('输入 /help 查看命令，输入 /exit 退出。');
+  console.log('如果对话失败，不要退出终端，直接看错误提示并按提示修复。');
 
   try {
     while (true) {
@@ -153,8 +160,16 @@ export async function runChatCommand(options) {
         continue;
       }
 
-      const reply = await askModel(line);
-      console.log(`\n${reply}\n`);
+      try {
+        const reply = await askModel(line);
+        console.log(`\n${reply}\n`);
+      } catch (error) {
+        console.log('');
+        console.log('Frees Agent 当前无法完成这次对话。');
+        console.log(error instanceof Error ? error.message : String(error));
+        console.log('你可以继续输入 /help、/reload，或者修复模型服务后直接继续聊天。');
+        console.log('');
+      }
     }
   } finally {
     rl.close();

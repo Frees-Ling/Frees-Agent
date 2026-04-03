@@ -5,6 +5,7 @@ const YELLOW = '\x1b[33m';
 const GREEN = '\x1b[32m';
 const DIM = '\x1b[2m';
 const BOLD = '\x1b[1m';
+const MAGENTA = '\x1b[35m';
 const ENABLE_COLOR = Boolean(process.stdout.isTTY);
 
 function color(text, code) {
@@ -16,32 +17,28 @@ function color(text, code) {
 
 export function printFreesAgentBanner(runtime, options = {}) {
   const banner = [
-    color('  ______                 ___              ___               __ ', CYAN),
-    color(' / ____/_______  ___    /   | ____ ____  / (_)___  ____ _/ /_', CYAN),
-    color('/ /_  / ___/ _ \\/ _ \\  / /| |/ __ `/ _ \\/ / / __ \\/ __ `/ __/', BLUE),
-    color('/ __/ / /  /  __/  __/ / ___ / /_/ /  __/ / / / / / /_/ / /_  ', BLUE),
-    color('/_/   /_/   \\___/\\___/ /_/  |_\\__, /\\___/_/_/_/ /_/\\__,_/\\__/  ', CYAN),
-    color('                              /____/                           ', CYAN)
+    color('╔════════════════════════════════════════════════════════════════════╗', MAGENTA),
+    color('║  ______                 ___              ___               __      ║', CYAN),
+    color('║ / ____/_______  ___    /   | ____ ____  / (_)___  ____ _/ /_     ║', CYAN),
+    color('║/ /_  / ___/ _ \\/ _ \\  / /| |/ __ `/ _ \\/ / / __ \\/ __ `/ __/     ║', BLUE),
+    color('║/ __/ / /  /  __/  __/ / ___ / /_/ /  __/ / / / / / /_/ / /_      ║', BLUE),
+    color('║/_/   /_/   \\___/\\___/ /_/  |_\\__, /\\___/_/_/_/ /_/\\__,_/\\__/      ║', CYAN),
+    color('║                              /____/                                ║', CYAN),
+    color('╚════════════════════════════════════════════════════════════════════╝', MAGENTA)
   ].join('\n');
 
   const mode = options.command || 'chat';
-  const capabilityLine = [
-    `provider=${runtime.providerName}`,
-    `model=${runtime.model}`,
-    `mode=${mode}`
-  ].join('  ');
-
-  const features = [
-    color('Memory', GREEN),
-    color('Long Context', GREEN),
+  const capabilityLine = `Provider: ${runtime.providerName} | Model: ${runtime.model} | Mode: ${mode}`;
+  const features = `Features: Memory | Long Context | ${
     runtime.config?.systemIntegration?.computerControl
-      ? color('Computer Control', YELLOW)
-      : color('Computer Control (manual setup required)', YELLOW)
-  ].join('  |  ');
+      ? 'Computer Control Enabled'
+      : 'Computer Control Requires Manual Setup'
+  }`;
 
   console.log(banner);
   console.log(color('Frees Agent 已连接模型', `${GREEN}${BOLD}`));
   console.log(color(capabilityLine, DIM));
   console.log(color(features, DIM));
+  console.log(color('Tip: 输入 /help 查看聊天命令；如果模型连不上，先运行 frees-agent doctor --ping', DIM));
   console.log('');
 }
