@@ -1,280 +1,205 @@
-# Claude Code Source Snapshot for Security Research
+# Frees Agent
 
-> This repository mirrors a **publicly exposed Claude Code source snapshot** that became accessible on **March 31, 2026** through a source map exposure in the npm distribution. It is maintained for **educational, defensive security research, and software supply-chain analysis**.
+`Frees Agent` 是一套跨平台终端 AI Agent CLI，定位是“可运行、可扩展、可跨平台”的轻量实现。当前实现不依赖第三方 npm 包，直接基于 Node.js 标准库运行，适合继续二次开发、接入更多模型后端，或者继续扩展成更完整的工程代理系统。
 
----
+## 产品定位
 
-## Research Context
+`Frees Agent` 面向以下场景：
 
-This repository is maintained by a **university student** studying:
+- 在终端里直接与 AI 聊天问答
+- 让 AI 阅读指定工作区代码并理解项目结构
+- 让 AI 根据需求自动生成代码、补全代码、修改代码
+- 在本地模型和云端模型之间切换
+- 在 Windows 和 macOS 上统一使用同一套 CLI 工作流
 
-- software supply-chain exposure and build artifact leaks
-- secure software engineering practices
-- agentic developer tooling architecture
-- defensive analysis of real-world CLI systems
+## 当前已支持的功能
 
-This archive is intended to support:
+### 1. 聊天能力
 
-- educational study
-- security research practice
-- architecture review
-- discussion of packaging and release-process failures
+- 支持终端交互式聊天
+- 支持单次消息模式
+- 支持绑定工作区后进行“带代码上下文”的项目问答
+- 支持在聊天中重新扫描工作区
 
-It does **not** claim ownership of the original code, and it should not be interpreted as an official Anthropic repository.
+对应命令：
 
----
+- `frees-agent chat [workspace]`
+- `frees-agent chat [workspace] --message "..."`
 
-## How the Public Snapshot Became Accessible
+### 2. 代码理解能力
 
-[Chaofan Shou (@Fried_rice)](https://x.com/Fried_rice) publicly noted that Claude Code source material was reachable through a `.map` file exposed in the npm package:
+- 自动扫描指定目录
+- 自动读取全部可载入的文本与代码文件
+- 自动建立工作区代码索引
+- 自动根据任务筛选相关文件
+- 支持文件列表、文本搜索、片段读取等上下文工具
 
-> **"Claude code source code has been leaked via a map file in their npm registry!"**
->
-> — [@Fried_rice, March 31, 2026](https://x.com/Fried_rice/status/2038894956459290963)
+这意味着在执行代码任务前，`Frees Agent` 会先尽量理解现有项目，而不是盲目生成代码。
 
-The published source map referenced unobfuscated TypeScript sources hosted in Anthropic's R2 storage bucket, which made the `src/` snapshot publicly downloadable.
+### 3. 代码编辑能力
 
----
+- 支持 Agent 式自动代码编辑
+- 支持生成新文件
+- 支持修改已有文件
+- 支持局部字符串替换
+- 支持创建目录
+- 支持删除文件
+- 支持 `dry-run` 预演模式
 
-## Repository Scope
+对应命令：
 
-Claude Code is Anthropic's CLI for interacting with Claude from the terminal to perform software engineering tasks such as editing files, running commands, searching codebases, and coordinating workflows.
+- `frees-agent edit <workspace> --task "..."`
 
-This repository contains a mirrored `src/` snapshot for research and analysis.
+### 4. 代码补全能力
 
-- **Public exposure identified on**: 2026-03-31
-- **Language**: TypeScript
-- **Runtime**: Bun
-- **Terminal UI**: React + [Ink](https://github.com/vadimdemedes/ink)
-- **Scale**: ~1,900 files, 512,000+ lines of code
+- 支持基于工作区上下文进行代码补全
+- 支持指定目标文件进行定向补全
+- 支持让模型结合相关文件风格生成补全结果
 
----
+对应命令：
 
-## Directory Structure
+- `frees-agent complete <workspace> --instruction "..."`
+- `frees-agent complete <workspace> --file src/main.ts --instruction "..."`
 
-```text
-src/
-├── main.tsx                 # Entrypoint orchestration (Commander.js-based CLI path)
-├── commands.ts              # Command registry
-├── tools.ts                 # Tool registry
-├── Tool.ts                  # Tool type definitions
-├── QueryEngine.ts           # LLM query engine
-├── context.ts               # System/user context collection
-├── cost-tracker.ts          # Token cost tracking
-│
-├── commands/                # Slash command implementations (~50)
-├── tools/                   # Agent tool implementations (~40)
-├── components/              # Ink UI components (~140)
-├── hooks/                   # React hooks
-├── services/                # External service integrations
-├── screens/                 # Full-screen UIs (Doctor, REPL, Resume)
-├── types/                   # TypeScript type definitions
-├── utils/                   # Utility functions
-│
-├── bridge/                  # IDE and remote-control bridge
-├── coordinator/             # Multi-agent coordinator
-├── plugins/                 # Plugin system
-├── skills/                  # Skill system
-├── keybindings/             # Keybinding configuration
-├── vim/                     # Vim mode
-├── voice/                   # Voice input
-├── remote/                  # Remote sessions
-├── server/                  # Server mode
-├── memdir/                  # Persistent memory directory
-├── tasks/                   # Task management
-├── state/                   # State management
-├── migrations/              # Config migrations
-├── schemas/                 # Config schemas (Zod)
-├── entrypoints/             # Initialization logic
-├── ink/                     # Ink renderer wrapper
-├── buddy/                   # Companion sprite
-├── native-ts/               # Native TypeScript utilities
-├── outputStyles/            # Output styling
-├── query/                   # Query pipeline
-└── upstreamproxy/           # Proxy configuration
+### 5. 配置与诊断能力
+
+- 支持初始化配置文件
+- 支持查看当前配置
+- 支持查看当前模型接入方式
+- 支持查看本地模型格式说明
+- 支持扫描工作区并输出诊断信息
+- 支持模型健康检查 `--ping`
+
+对应命令：
+
+- `frees-agent config init`
+- `frees-agent config show`
+- `frees-agent doctor [workspace]`
+- `frees-agent doctor [workspace] --ping`
+
+## 支持的平台
+
+- macOS
+- Windows
+
+当前代码没有依赖特定 shell，也没有依赖 Bun、GNU 工具或类 Unix 专属路径逻辑，路径处理全部走 Node.js `path`，因此更容易保持跨平台一致性。
+
+## 模型支持
+
+### 1. 本地模型接入方式
+
+`Frees Agent` 当前内置三种模型接入方式：
+
+- `ollama`
+  适合本地直接部署与运行模型，接入最简单。
+- `openai-compatible`
+  适合通过 `LM Studio`、`llama.cpp server`、`vLLM`、`TGI`、`LocalAI` 等服务，以 OpenAI 兼容接口方式接入本地模型。
+- `anthropic`
+  适合直接接入云端 API。
+
+### 2. 支持的本地模型格式
+
+- `GGUF`
+  适合 `Ollama`、`llama.cpp`、`LM Studio` 等本地运行环境。
+- `GGUF` 多切割模型
+  例如：
+  `model-00001-of-00004.gguf`
+  `model-00002-of-00004.gguf`
+  `model-00003-of-00004.gguf`
+  `model-00004-of-00004.gguf`
+  这类模型一般由本地推理后端负责装载与拼接，CLI 通过本地服务统一访问。
+- `MLX`
+  适合 Apple Silicon / macOS。
+- `safetensors`
+  适合 `vLLM`、`TGI` 等本地推理服务。
+
+说明：
+`Frees Agent` 采用的是“统一接入本地推理服务”的架构，而不是把推理框架硬编码进 CLI 本体。这样在 Windows 和 macOS 上更稳，也更方便替换模型后端。
+
+## 快速开始
+
+### 1. 初始化配置
+
+```bash
+node ./bin/ai-agent.js config init
 ```
 
----
+如果以包方式安装，也可以直接使用：
 
-## Architecture Summary
-
-### 1. Tool System (`src/tools/`)
-
-Every tool Claude Code can invoke is implemented as a self-contained module. Each tool defines its input schema, permission model, and execution logic.
-
-| Tool | Description |
-|---|---|
-| `BashTool` | Shell command execution |
-| `FileReadTool` | File reading (images, PDFs, notebooks) |
-| `FileWriteTool` | File creation / overwrite |
-| `FileEditTool` | Partial file modification (string replacement) |
-| `GlobTool` | File pattern matching search |
-| `GrepTool` | ripgrep-based content search |
-| `WebFetchTool` | Fetch URL content |
-| `WebSearchTool` | Web search |
-| `AgentTool` | Sub-agent spawning |
-| `SkillTool` | Skill execution |
-| `MCPTool` | MCP server tool invocation |
-| `LSPTool` | Language Server Protocol integration |
-| `NotebookEditTool` | Jupyter notebook editing |
-| `TaskCreateTool` / `TaskUpdateTool` | Task creation and management |
-| `SendMessageTool` | Inter-agent messaging |
-| `TeamCreateTool` / `TeamDeleteTool` | Team agent management |
-| `EnterPlanModeTool` / `ExitPlanModeTool` | Plan mode toggle |
-| `EnterWorktreeTool` / `ExitWorktreeTool` | Git worktree isolation |
-| `ToolSearchTool` | Deferred tool discovery |
-| `CronCreateTool` | Scheduled trigger creation |
-| `RemoteTriggerTool` | Remote trigger |
-| `SleepTool` | Proactive mode wait |
-| `SyntheticOutputTool` | Structured output generation |
-
-### 2. Command System (`src/commands/`)
-
-User-facing slash commands invoked with `/` prefix.
-
-| Command | Description |
-|---|---|
-| `/commit` | Create a git commit |
-| `/review` | Code review |
-| `/compact` | Context compression |
-| `/mcp` | MCP server management |
-| `/config` | Settings management |
-| `/doctor` | Environment diagnostics |
-| `/login` / `/logout` | Authentication |
-| `/memory` | Persistent memory management |
-| `/skills` | Skill management |
-| `/tasks` | Task management |
-| `/vim` | Vim mode toggle |
-| `/diff` | View changes |
-| `/cost` | Check usage cost |
-| `/theme` | Change theme |
-| `/context` | Context visualization |
-| `/pr_comments` | View PR comments |
-| `/resume` | Restore previous session |
-| `/share` | Share session |
-| `/desktop` | Desktop app handoff |
-| `/mobile` | Mobile app handoff |
-
-### 3. Service Layer (`src/services/`)
-
-| Service | Description |
-|---|---|
-| `api/` | Anthropic API client, file API, bootstrap |
-| `mcp/` | Model Context Protocol server connection and management |
-| `oauth/` | OAuth 2.0 authentication flow |
-| `lsp/` | Language Server Protocol manager |
-| `analytics/` | GrowthBook-based feature flags and analytics |
-| `plugins/` | Plugin loader |
-| `compact/` | Conversation context compression |
-| `policyLimits/` | Organization policy limits |
-| `remoteManagedSettings/` | Remote managed settings |
-| `extractMemories/` | Automatic memory extraction |
-| `tokenEstimation.ts` | Token count estimation |
-| `teamMemorySync/` | Team memory synchronization |
-
-### 4. Bridge System (`src/bridge/`)
-
-A bidirectional communication layer connecting IDE extensions (VS Code, JetBrains) with the Claude Code CLI.
-
-- `bridgeMain.ts` — Bridge main loop
-- `bridgeMessaging.ts` — Message protocol
-- `bridgePermissionCallbacks.ts` — Permission callbacks
-- `replBridge.ts` — REPL session bridge
-- `jwtUtils.ts` — JWT-based authentication
-- `sessionRunner.ts` — Session execution management
-
-### 5. Permission System (`src/hooks/toolPermission/`)
-
-Checks permissions on every tool invocation. Either prompts the user for approval/denial or automatically resolves based on the configured permission mode (`default`, `plan`, `bypassPermissions`, `auto`, etc.).
-
-### 6. Feature Flags
-
-Dead code elimination via Bun's `bun:bundle` feature flags:
-
-```typescript
-import { feature } from 'bun:bundle'
-
-// Inactive code is completely stripped at build time
-const voiceCommand = feature('VOICE_MODE')
-  ? require('./commands/voice/index.js').default
-  : null
+```bash
+frees-agent config init
 ```
 
-Notable flags: `PROACTIVE`, `KAIROS`, `BRIDGE_MODE`, `DAEMON`, `VOICE_MODE`, `AGENT_TRIGGERS`, `MONITOR_TOOL`
+默认配置文件位置：
 
----
+- macOS/Linux: `~/.terminal-ai-agent/config.json`
+- Windows: 当前用户主目录下的 `.terminal-ai-agent/config.json`
 
-## Key Files in Detail
+### 2. 终端聊天
 
-### `QueryEngine.ts` (~46K lines)
-
-The core engine for LLM API calls. Handles streaming responses, tool-call loops, thinking mode, retry logic, and token counting.
-
-### `Tool.ts` (~29K lines)
-
-Defines base types and interfaces for all tools — input schemas, permission models, and progress state types.
-
-### `commands.ts` (~25K lines)
-
-Manages registration and execution of all slash commands. Uses conditional imports to load different command sets per environment.
-
-### `main.tsx`
-
-Commander.js-based CLI parser and React/Ink renderer initialization. At startup, it overlaps MDM settings, keychain prefetch, and GrowthBook initialization for faster boot.
-
----
-
-## Tech Stack
-
-| Category | Technology |
-|---|---|
-| Runtime | [Bun](https://bun.sh) |
-| Language | TypeScript (strict) |
-| Terminal UI | [React](https://react.dev) + [Ink](https://github.com/vadimdemedes/ink) |
-| CLI Parsing | [Commander.js](https://github.com/tj/commander.js) (extra-typings) |
-| Schema Validation | [Zod v4](https://zod.dev) |
-| Code Search | [ripgrep](https://github.com/BurntSushi/ripgrep) |
-| Protocols | [MCP SDK](https://modelcontextprotocol.io), LSP |
-| API | [Anthropic SDK](https://docs.anthropic.com) |
-| Telemetry | OpenTelemetry + gRPC |
-| Feature Flags | GrowthBook |
-| Auth | OAuth 2.0, JWT, macOS Keychain |
-
----
-
-## Notable Design Patterns
-
-### Parallel Prefetch
-
-Startup time is optimized by prefetching MDM settings, keychain reads, and API preconnect in parallel before heavy module evaluation begins.
-
-```typescript
-// main.tsx — fired as side-effects before other imports
-startMdmRawRead()
-startKeychainPrefetch()
+```bash
+node ./bin/ai-agent.js chat .
 ```
 
-### Lazy Loading
+### 3. 自动代码编辑
 
-Heavy modules (OpenTelemetry, gRPC, analytics, and some feature-gated subsystems) are deferred via dynamic `import()` until actually needed.
+```bash
+node ./bin/ai-agent.js edit . --task "阅读当前项目并补齐一个新的 CLI doctor 子命令"
+```
 
-### Agent Swarms
+### 4. 代码补全
 
-Sub-agents are spawned via `AgentTool`, with `coordinator/` handling multi-agent orchestration. `TeamCreateTool` enables team-level parallel work.
+```bash
+node ./bin/ai-agent.js complete . --file src/main.ts --instruction "补全参数校验逻辑"
+```
 
-### Skill System
+### 5. 环境诊断
 
-Reusable workflows defined in `skills/` are executed through `SkillTool`. Users can add custom skills.
+```bash
+node ./bin/ai-agent.js doctor . --ping
+```
 
-### Plugin Architecture
+## Agent 代码编辑工作流
 
-Built-in and third-party plugins are loaded through the `plugins/` subsystem.
+当执行 `edit` 命令时，`Frees Agent` 会按下面的流程工作：
 
----
+1. 扫描工作区
+2. 读取全部可载入的文本/代码文件并建立索引
+3. 基于任务对相关文件进行筛选
+4. 把工作区概览和相关代码片段提供给模型
+5. 允许模型通过工具循环完成代码任务
+6. 最后输出改动总结
 
-## Research / Ownership Disclaimer
+当前内置工具包括：
 
-- This repository is an **educational and defensive security research archive** maintained by a university student.
-- It exists to study source exposure, packaging failures, and the architecture of modern agentic CLI systems.
-- The original Claude Code source remains the property of **Anthropic**.
-- This repository is **not affiliated with, endorsed by, or maintained by Anthropic**.
+- `list_files`
+- `search_text`
+- `read_file`
+- `write_file`
+- `replace_in_file`
+- `mkdir`
+- `delete_file`
+
+这套机制对应了“给定文件夹后，自行阅读全部代码、自动补全、自动 Agent、自动生成代码与修改代码”的目标。
+
+## 工程目录说明
+
+- `agent-cli/`
+  `Frees Agent` 独立工程目录
+- `agent-cli/src/cli.js`
+  命令入口与参数解析
+- `agent-cli/src/model/`
+  模型接入层
+- `agent-cli/src/workspace/`
+  工作区扫描、索引与查询
+- `agent-cli/src/agent/`
+  Agent 提示词与编辑循环
+- `agent-cli/src/commands/`
+  命令实现
+
+## 当前设计特点
+
+- 不直接修改仓库原始 `src/` 快照逻辑
+- 新工程完全独立，便于单独维护
+- 零第三方依赖，便于跨平台运行
+- 已经具备继续扩展成更强 Agent CLI 的基础骨架
