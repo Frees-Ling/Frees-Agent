@@ -2,20 +2,19 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { buildChatUserPrompt, CHAT_SYSTEM_PROMPT } from '../agent/prompts.js';
+import {
+  buildChatSystemPrompt,
+  compactConversationIfNeeded,
+  describeMemoryState,
+  updateMemoryAfterTurn
+} from '../memory/manager.js';
+import { createMemoryStore, getRecentMessagesForModel, loadMemoryState, saveMemoryState } from '../memory/store.js';
 import { createModelClient } from '../model/index.js';
 import { runEditCommand } from './edit.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
 
-function buildMessages(history) {
-  return history.map(item => ({
-    role: item.role,
-    content: item.content
-  }));
-}
-
 export async function runChatCommand(options) {
   const { client, runtime } = await createModelClient(options);
-  const history = [];
   let index = null;
   let workspaceOverview = '未指定工作区。';
   let workspaceRoot = null;
@@ -29,6 +28,20 @@ export async function runChatCommand(options) {
     );
   }
 
+  const memoryStore = await createMemoryStore({
+    configPath: runtime.configPath,
+    workspaceRoot,
+    sessionName: options.session || runtime.config.conversation?.defaultSessionName
+  });
+  const memoryState = await loadMemoryState(memoryStore, runtime.config);
+
+  if (options.resetSession) {
+    memoryState.session.summary = '';
+    memoryState.session.totalTurns = 0;
+    memoryState.session.recentMessages = [];
+    await saveMemoryState(memoryState);
+  }
+
   async function askModel(message) {
     const relevantFiles = index ? findRelevantFiles(index, message) : [];
     const prompt = buildChatUserPrompt({
@@ -36,14 +49,29 @@ export async function runChatCommand(options) {
       workspaceOverview,
       relevantFiles
     });
+    const systemPrompt = buildChatSystemPrompt({
+      baseSystemPrompt: CHAT_SYSTEM_PROMPT,
+      state: memoryState,
+      config: runtime.config
+    });
     const reply = await client.generateText({
-      systemPrompt: CHAT_SYSTEM_PROMPT,
-      messages: [...buildMessages(history), { role: 'user', content: prompt }],
+      systemPrompt,
+      messages: [...getRecentMessagesForModel(memoryState), { role: 'user', content: prompt }],
       temperature: options.temperature,
       maxOutputTokens: options.maxOutputTokens
     });
-    history.push({ role: 'user', content: message });
-    history.push({ role: 'assistant', content: reply });
+    await updateMemoryAfterTurn({
+      client,
+      state: memoryState,
+      userMessage: message,
+      assistantMessage: reply,
+      config: runtime.config
+    });
+    await compactConversationIfNeeded({
+      client,
+      state: memoryState,
+      config: runtime.config
+    });
     return reply;
   }
 
@@ -54,7 +82,8 @@ export async function runChatCommand(options) {
   }
 
   const rl = readline.createInterface({ input, output });
-  console.log(`AI Agent Chat 已启动。provider=${runtime.providerName} model=${runtime.model}`);
+  console.log(`Frees Agent Chat 已启动。provider=${runtime.providerName} model=${runtime.model}`);
+  console.log(`session=${memoryState.session.name} id=${memoryState.session.id}`);
   console.log('输入 /help 查看命令，/exit 退出。');
 
   try {
@@ -73,12 +102,30 @@ export async function runChatCommand(options) {
         console.log('/exit       退出聊天');
         console.log('/reload     重新扫描工作区');
         console.log('/edit ...   在当前工作区执行代码 Agent');
+        console.log('/memory     查看当前持久化记忆');
+        console.log('/profile    查看当前用户画像');
+        console.log('/summary    查看长对话摘要');
+        continue;
+      }
+
+      if (line === '/memory') {
+        console.log(JSON.stringify(describeMemoryState(memoryState), null, 2));
+        continue;
+      }
+
+      if (line === '/profile') {
+        console.log(JSON.stringify(memoryState.profile, null, 2));
+        continue;
+      }
+
+      if (line === '/summary') {
+        console.log(memoryState.session.summary || '当前还没有长对话摘要。');
         continue;
       }
 
       if (line === '/reload') {
         if (!workspaceRoot) {
-          console.log('当前没有工作区。可使用 ai-agent chat <workspace> 启动。');
+          console.log('当前没有工作区。可使用 frees-agent chat <workspace> 启动。');
           continue;
         }
         index = await scanWorkspace(workspaceRoot, runtime.config.workspace);

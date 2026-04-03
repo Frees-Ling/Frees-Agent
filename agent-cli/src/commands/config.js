@@ -17,5 +17,5 @@ export async function runConfigCommand(options) {
   }
 
   console.log(`config path: ${getConfigPath(options.configPath)}`);
-  console.log('用法: ai-agent config init [--force] | ai-agent config show');
+  console.log('用法: frees-agent config init [--force] | frees-agent config show');
 }

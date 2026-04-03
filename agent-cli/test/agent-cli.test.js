@@ -4,6 +4,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { runEditAgent } from '../src/agent/edit-loop.js';
+import {
+  buildChatSystemPrompt,
+  compactConversationIfNeeded,
+  updateMemoryAfterTurn
+} from '../src/memory/manager.js';
+import { createMemoryStore, loadMemoryState } from '../src/memory/store.js';
 import { extractFirstJsonObject } from '../src/utils/json.js';
 import {
   buildWorkspaceOverview,
@@ -86,4 +92,132 @@ test('edit agent can drive tool loop and modify files', async () => {
   const content = await readFile(targetFile, 'utf8');
   assert.match(content, /"new"/);
   assert.equal(result.summary, 'updated file');
+});
+
+test('memory store persists profile and durable memories', async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'agent-cli-memory-'));
+  const configPath = path.join(tempRoot, 'config.json');
+  await writeFile(configPath, '{}\n');
+
+  const store = await createMemoryStore({
+    configPath,
+    workspaceRoot: tempRoot,
+    sessionName: 'demo'
+  });
+  const state = await loadMemoryState(store, {
+    memory: {
+      enabled: true,
+      autoExtract: true,
+      maxDurableMemories: 80
+    },
+    conversation: {
+      keepRecentMessages: 12,
+      summarizeAfterMessages: 18,
+      maxSummaryChars: 6000
+    }
+  });
+
+  const fakeClient = {
+    async generateText({ systemPrompt }) {
+      if (String(systemPrompt).includes('长期记忆提取器')) {
+        return JSON.stringify({
+          profilePatch: {
+            language: 'zh-CN',
+            goals: ['构建更强的 AI Agent CLI']
+          },
+          durableMemories: [
+            {
+              category: 'goal',
+              content: '用户希望 Frees Agent 支持更强的记忆和长对话。'
+            }
+          ]
+        });
+      }
+      return '{}';
+    }
+  };
+
+  await updateMemoryAfterTurn({
+    client: fakeClient,
+    state,
+    userMessage: '请帮我把 Frees Agent 做得更强，最好支持超长对话和记忆。',
+    assistantMessage: '好的，我会为你增强记忆和长对话。',
+    config: state.config
+  });
+
+  const reloaded = await loadMemoryState(store, state.config);
+  assert.equal(reloaded.profile.language, 'zh-CN');
+  assert.match(reloaded.durableMemories[0].content, /长对话/);
+});
+
+test('conversation compaction builds session summary', async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'agent-cli-summary-'));
+  const configPath = path.join(tempRoot, 'config.json');
+  await writeFile(configPath, '{}\n');
+
+  const store = await createMemoryStore({
+    configPath,
+    workspaceRoot: tempRoot,
+    sessionName: 'summary'
+  });
+  const state = await loadMemoryState(store, {
+    memory: {
+      enabled: true,
+      autoExtract: false
+    },
+    conversation: {
+      keepRecentMessages: 4,
+      summarizeAfterMessages: 6,
+      maxSummaryChars: 6000
+    }
+  });
+
+  for (let index = 0; index < 8; index += 1) {
+    state.session.recentMessages.push({
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      content: `message-${index}`,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  const fakeClient = {
+    async generateText() {
+      return JSON.stringify({
+        summary: '用户正在增强 Frees Agent，并讨论了记忆与超长对话。',
+        keyFacts: ['要支持持久化记忆', '要支持长对话摘要'],
+        openLoops: ['继续完善文档']
+      });
+    }
+  };
+
+  await compactConversationIfNeeded({
+    client: fakeClient,
+    state,
+    config: state.config
+  });
+
+  assert.match(state.session.summary, /持久化记忆/);
+  assert.equal(state.session.recentMessages.length, 4);
+});
+
+test('chat system prompt includes memory context', async () => {
+  const prompt = buildChatSystemPrompt({
+    baseSystemPrompt: 'base',
+    state: {
+      profile: { language: 'zh-CN' },
+      durableMemories: [{ category: 'goal', content: '构建 Frees Agent' }],
+      session: { summary: '之前已经讨论过记忆系统。' }
+    },
+    config: {
+      memory: {
+        enabled: true,
+        includeUserProfile: true,
+        includeDurableMemories: true
+      }
+    }
+  });
+
+  assert.match(prompt, /用户画像/);
+  assert.match(prompt, /长期记忆/);
+  assert.match(prompt, /长对话摘要/);
 });

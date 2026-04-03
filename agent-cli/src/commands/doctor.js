@@ -18,6 +18,12 @@ export async function runDoctorCommand(options) {
     }
   }
 
+  console.log('\nMemory & conversation:');
+  console.log(`- memory enabled: ${runtime.config.memory?.enabled !== false}`);
+  console.log(`- auto extract: ${runtime.config.memory?.autoExtract !== false}`);
+  console.log(`- keep recent messages: ${runtime.config.conversation?.keepRecentMessages}`);
+  console.log(`- summarize after messages: ${runtime.config.conversation?.summarizeAfterMessages}`);
+
   if (options.workspace) {
     const workspaceRoot = path.resolve(options.workspace);
     const index = await scanWorkspace(workspaceRoot, runtime.config.workspace);

@@ -2,8 +2,10 @@ import { parseArgs } from 'node:util';
 import { runChatCommand } from './commands/chat.js';
 import { runCompleteCommand } from './commands/complete.js';
 import { runConfigCommand } from './commands/config.js';
+import { runDocsCommand } from './commands/docs.js';
 import { runDoctorCommand } from './commands/doctor.js';
 import { runEditCommand } from './commands/edit.js';
+import { runMemoryCommand } from './commands/memory.js';
 
 const HELP_TEXT = `
 Frees Agent
@@ -15,6 +17,8 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
 - Agent 式自动代码编辑、生成与重构
 - 本地模型与云端 API 统一接入
 - Windows 与 macOS 平台运行
+- 持久化记忆、用户画像和超长对话摘要压缩
+- 内置中文文档区，可直接查看 LLM/训练/API 接入说明
 
 命令：
   frees-agent chat [workspace] [--message "..."]
@@ -23,6 +27,8 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
   frees-agent doctor [workspace] [--ping]
   frees-agent config init [--force]
   frees-agent config show
+  frees-agent memory show|clear|sessions
+  frees-agent docs [topic]
 
 通用参数：
   --provider anthropic|ollama|openai-compatible
@@ -61,6 +67,8 @@ export async function main(argv = process.argv.slice(2)) {
         'api-key': { type: 'string' },
         'api-key-env': { type: 'string' },
         config: { type: 'string' },
+        session: { type: 'string', short: 's' },
+        'reset-session': { type: 'boolean' },
         temperature: { type: 'string' },
         'max-output-tokens': { type: 'string' },
         verbose: { type: 'boolean' },
@@ -82,6 +90,8 @@ export async function main(argv = process.argv.slice(2)) {
       apiKey: parsed.values['api-key'],
       apiKeyEnv: parsed.values['api-key-env'],
       configPath: parsed.values.config,
+      session: parsed.values.session,
+      resetSession: Boolean(parsed.values['reset-session']),
       temperature:
         parsed.values.temperature !== undefined
           ? Number(parsed.values.temperature)
@@ -252,6 +262,56 @@ export async function main(argv = process.argv.slice(2)) {
       args: parsed.positionals.slice(1),
       configPath: parsed.values.config,
       force: Boolean(parsed.values.force)
+    });
+    return;
+  }
+
+  if (command === 'memory') {
+    const parsed = parseArgs({
+      args: argv.slice(1),
+      allowPositionals: true,
+      options: {
+        config: { type: 'string' },
+        workspace: { type: 'string', short: 'w' },
+        session: { type: 'string', short: 's' },
+        all: { type: 'boolean' },
+        profile: { type: 'boolean' },
+        durable: { type: 'boolean' },
+        'session-only': { type: 'boolean' },
+        help: { type: 'boolean', short: 'h' }
+      }
+    });
+    if (parsed.values.help) {
+      printHelp();
+      return;
+    }
+    await runMemoryCommand({
+      subcommand: parsed.positionals[0],
+      configPath: parsed.values.config,
+      workspace: parsed.values.workspace,
+      session: parsed.values.session,
+      all: Boolean(parsed.values.all),
+      profile: Boolean(parsed.values.profile),
+      durable: Boolean(parsed.values.durable),
+      sessionOnly: Boolean(parsed.values['session-only'])
+    });
+    return;
+  }
+
+  if (command === 'docs') {
+    const parsed = parseArgs({
+      args: argv.slice(1),
+      allowPositionals: true,
+      options: {
+        help: { type: 'boolean', short: 'h' }
+      }
+    });
+    if (parsed.values.help) {
+      printHelp();
+      return;
+    }
+    await runDocsCommand({
+      topic: parsed.positionals[0]
     });
     return;
   }

@@ -57,6 +57,20 @@ const DEFAULT_CONFIG = {
     ],
     maxFileBytes: 1024 * 1024,
     maxWorkspaceBytes: 24 * 1024 * 1024
+  },
+  memory: {
+    enabled: true,
+    autoExtract: true,
+    includeUserProfile: true,
+    includeDurableMemories: true,
+    maxDurableMemories: 80
+  },
+  conversation: {
+    persistSessions: true,
+    keepRecentMessages: 12,
+    summarizeAfterMessages: 18,
+    maxSummaryChars: 6000,
+    defaultSessionName: 'default'
   }
 };
 

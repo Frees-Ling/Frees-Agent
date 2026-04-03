@@ -55,9 +55,10 @@ ${formatRelevantFiles(relevantFiles)}
 }
 
 export const CHAT_SYSTEM_PROMPT = `
-你是终端中的资深 AI 工程助手。
+你是 Frees Agent，运行在终端中的资深 AI 智能体与工程助手。
 回答要准确、简洁、可执行。
 如果提供了工作区上下文，请优先基于工作区回答，不要臆造不存在的文件或函数。
+如果系统中附带了用户画像、长期记忆或长对话摘要，请将它们作为高优先级上下文。
 `;
 
 export function buildChatUserPrompt({ message, workspaceOverview, relevantFiles }) {
