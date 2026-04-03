@@ -1,0 +1,98 @@
+import { truncateForModel } from '../utils/json.js';
+
+export const EDIT_AGENT_SYSTEM_PROMPT = `
+你是一个终端里的代码代理（AI coding agent）。
+
+你必须严格遵守：
+1. 每次只输出一个 JSON 对象，不要输出 Markdown，不要输出解释性前缀。
+2. 如果还需要信息，输出：
+   {"type":"tool","tool":"<tool_name>","args":{...},"reason":"..."}
+3. 如果已经完成，输出：
+   {"type":"final","summary":"...","changedFiles":["a","b"],"notes":["..."]}
+4. 优先读取、搜索和理解现有代码，再修改。
+5. 仅在工作区内操作，不要假设工作区外可用。
+6. 生成代码时保持现有风格、命名、目录组织和平台兼容性。
+`;
+
+export function formatRelevantFiles(files, { maxCharsPerFile = 3500 } = {}) {
+  if (!files.length) {
+    return 'No relevant files preselected.';
+  }
+  return files
+    .map(file => {
+      const content = file.content ? truncateForModel(file.content, maxCharsPerFile) : '[not loaded]';
+      return `FILE: ${file.relativePath}\n${content}`;
+    })
+    .join('\n\n');
+}
+
+export function buildEditUserPrompt({ task, workspaceOverview, relevantFiles, dryRun = false }) {
+  return `
+用户任务：
+${task}
+
+工作区概览：
+${workspaceOverview}
+
+预选相关文件：
+${formatRelevantFiles(relevantFiles)}
+
+可用工具：
+- list_files { "pathPrefix"?: ".", "pattern"?: "**", "limit"?: 200 }
+- search_text { "query": "text or /regex/i", "limit"?: 20 }
+- read_file { "path": "src/app.ts", "startLine"?: 1, "endLine"?: 200 }
+- write_file { "path": "src/app.ts", "content": "..." }
+- replace_in_file { "path": "...", "oldText": "...", "newText": "...", "replaceAll"?: false }
+- mkdir { "path": "src/newdir" }
+- delete_file { "path": "tmp.txt" }
+
+执行要求：
+- 先理解现有实现，再改代码。
+- 能局部替换就不要重写整个文件。
+- 如果 dryRun=${dryRun ? 'true' : 'false'}，仍然可以规划与产出补丁，但不要真的写盘。
+- 完成后返回 final JSON，总结改动与涉及文件。
+`.trim();
+}
+
+export const CHAT_SYSTEM_PROMPT = `
+你是终端中的资深 AI 工程助手。
+回答要准确、简洁、可执行。
+如果提供了工作区上下文，请优先基于工作区回答，不要臆造不存在的文件或函数。
+`;
+
+export function buildChatUserPrompt({ message, workspaceOverview, relevantFiles }) {
+  return `
+用户问题：
+${message}
+
+工作区概览：
+${workspaceOverview}
+
+相关文件片段：
+${formatRelevantFiles(relevantFiles, { maxCharsPerFile: 2500 })}
+`.trim();
+}
+
+export const COMPLETE_SYSTEM_PROMPT = `
+你是上下文感知代码补全引擎。
+返回内容应尽量直接给出代码或清晰的替换方案，避免冗长解释。
+如果用户指定了文件，请优先保持该文件的代码风格与命名习惯。
+`;
+
+export function buildCompletionPrompt({ instruction, workspaceOverview, relevantFiles, fileContext }) {
+  return `
+补全任务：
+${instruction}
+
+工作区概览：
+${workspaceOverview}
+
+目标文件内容：
+${fileContext || '未指定目标文件'}
+
+相关文件片段：
+${formatRelevantFiles(relevantFiles, { maxCharsPerFile: 2500 })}
+
+请直接输出建议代码；如需要说明，保持极简。
+`.trim();
+}

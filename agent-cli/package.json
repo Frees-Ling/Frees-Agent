@@ -1,0 +1,21 @@
+{
+  "name": "frees-agent-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "frees-agent": "./bin/ai-agent.js",
+    "ai-agent": "./bin/ai-agent.js"
+  },
+  "scripts": {
+    "start": "node ./bin/ai-agent.js",
+    "chat": "node ./bin/ai-agent.js chat",
+    "edit": "node ./bin/ai-agent.js edit",
+    "complete": "node ./bin/ai-agent.js complete",
+    "doctor": "node ./bin/ai-agent.js doctor",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
