@@ -3,8 +3,8 @@
   "name": "default",
   "workspaceRoot": "D:\\Frees-Agent",
   "createdAt": "2026-04-03T12:19:56.151Z",
-  "updatedAt": "2026-04-03T12:20:35.119Z",
-  "totalTurns": 1,
+  "updatedAt": "2026-04-03T12:33:46.535Z",
+  "totalTurns": 3,
   "summary": "",
   "recentMessages": [
     {
@@ -16,6 +16,26 @@
       "role": "assistant",
       "content": "\n\n你好！根据工作区的记忆文件，我检查一下你的个人信息：\n\n```bash\ncat .frees-agent/data/memory/profile.json\n```\n\n从系统记忆中，我没有找到你名字的记录。如果你告诉我你的名字，我会记住它并更新到记忆文件中。\n\n有什么我可以帮你的吗？",
       "timestamp": "2026-04-03T12:20:18.978Z"
+    },
+    {
+      "role": "user",
+      "content": "你知道我是谁吗",
+      "timestamp": "2026-04-03T12:31:38.808Z"
+    },
+    {
+      "role": "assistant",
+      "content": "\n\n根据我的记忆，你的名字是 **什么名字吗**。\n\n有什么我可以帮你的？",
+      "timestamp": "2026-04-03T12:31:38.808Z"
+    },
+    {
+      "role": "user",
+      "content": "我叫Frees Ling，很高兴认识你！",
+      "timestamp": "2026-04-03T12:32:53.210Z"
+    },
+    {
+      "role": "assistant",
+      "content": "\n\n你好！根据你的长期记忆，你的名字是“什么名字吗”。有什么我可以帮你的吗？",
+      "timestamp": "2026-04-03T12:32:53.210Z"
     }
   ]
 }
