@@ -10,9 +10,9 @@ const DEFAULT_CONFIG = {
       model: 'qwen2.5-coder:7b'
     },
     'openai-compatible': {
-      baseUrl: 'http://10.102.194.57:1234/v1',// http://127.0.0.1:1234/v1
+      baseUrl: 'http://192.168.2.5:1202/v1',// http://127.0.0.1:1234/v1
       apiKeyEnv: 'OPENAI_API_KEY',
-      model: 'qwen/qwen3.5-9b'
+      model: 'motified-model'
     },
     anthropic: {
       baseUrl: 'https://api.anthropic.com',
