@@ -10,7 +10,7 @@ const DEFAULT_CONFIG = {
       model: 'qwen2.5-coder:7b'
     },
     'openai-compatible': {
-      baseUrl: 'http://127.0.0.1:1234/v1',
+      baseUrl: 'http://10.102.194.57:1234/v1',// http://127.0.0.1:1234/v1
       apiKeyEnv: 'OPENAI_API_KEY',
       model: 'qwen/qwen3.5-9b'
     },

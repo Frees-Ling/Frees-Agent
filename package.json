@@ -1,5 +1,15 @@
 {
   "dependencies": {
     "@tavily/core": "^0.7.2"
+  },
+  "bin": "dist/index.js",
+  "pkg": {
+    "assets": [
+      ".frees-agent/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "release"
   }
 }
