@@ -1,0 +1,91 @@
+{
+  "id": "frees-agent-default-e127cf7c",
+  "name": "default",
+  "workspaceRoot": "/Users/freesling/Develop/Frees-Agent",
+  "createdAt": "2026-04-04T08:20:14.178Z",
+  "updatedAt": "2026-04-04T08:43:05.521Z",
+  "totalTurns": 8,
+  "summary": "",
+  "recentMessages": [
+    {
+      "role": "user",
+      "content": "你好哦，我是谁",
+      "timestamp": "2026-04-04T08:20:30.173Z"
+    },
+    {
+      "role": "assistant",
+      "content": "你的名字是 Frees Ling。",
+      "timestamp": "2026-04-04T08:20:30.173Z"
+    },
+    {
+      "role": "user",
+      "content": "我们的组合是什么",
+      "timestamp": "2026-04-04T08:21:43.848Z"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "timestamp": "2026-04-04T08:21:43.848Z"
+    },
+    {
+      "role": "user",
+      "content": "你好哦",
+      "timestamp": "2026-04-04T08:39:18.389Z"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "timestamp": "2026-04-04T08:39:18.389Z"
+    },
+    {
+      "role": "user",
+      "content": "你是谁",
+      "timestamp": "2026-04-04T08:39:46.349Z"
+    },
+    {
+      "role": "assistant",
+      "content": "我们是 Frees Agent 和 Frees Ling 的组合。",
+      "timestamp": "2026-04-04T08:39:46.349Z"
+    },
+    {
+      "role": "user",
+      "content": "你还记得我们之间的一些事情吗",
+      "timestamp": "2026-04-04T08:40:25.081Z"
+    },
+    {
+      "role": "assistant",
+      "content": "根据记忆，我记得以下关于我们的事情：\n\n1. **你的名字**：Frees Ling\n\n2. **我们的组合**：我是 Frees Agent，你是 Frees Ling\n\n3. **你正在开发的项目**：一个 Rust 猜数字小游戏，游戏范围 1-100，最多 10 次尝试，支持重玩功能，项目目录在 `C:\\Users\\lenovo\\Desktop\\ai-game`\n\n4. **当前工作区**：我们目前位于 `/Users/freesling/Develop/Frees-Agent`，这是 Frees Agent 的项目目录\n\n这些是我们之间的一些关键信息。还有什么具体的事情你想让我帮你处理吗？",
+      "timestamp": "2026-04-04T08:40:25.081Z"
+    },
+    {
+      "role": "user",
+      "content": "你知道我最好的朋友是谁吗",
+      "timestamp": "2026-04-04T08:40:47.369Z"
+    },
+    {
+      "role": "assistant",
+      "content": "根据我的记忆和工作区上下文，我没有记录关于你最好的朋友的信息。",
+      "timestamp": "2026-04-04T08:40:47.369Z"
+    },
+    {
+      "role": "user",
+      "content": "你还记得我的好朋友是谁吗",
+      "timestamp": "2026-04-04T08:41:19.723Z"
+    },
+    {
+      "role": "assistant",
+      "content": "根据我的记忆和工作区上下文，我没有记录关于你最好的朋友的信息。",
+      "timestamp": "2026-04-04T08:41:19.723Z"
+    },
+    {
+      "role": "user",
+      "content": "cat durable-memories.json",
+      "timestamp": "2026-04-04T08:42:54.533Z"
+    },
+    {
+      "role": "assistant",
+      "content": "```json\n[\n  {\n    \"id\": \"9a55f2e2\",\n    \"category\": \"profile\",\n    \"content\": \"用户的名字是 Frees Ling。\",\n    \"createdAt\": \"2026-04-03T12:32:53.210Z\"\n  },\n  {\n    \"id\": \"17ce90c3\",\n    \"category\": \"project\",\n    \"content\": \"用户正在开发一个 Rust 猜数字小游戏项目，目录：C:\\\\Users\\\\lenovo\\\\Desktop\\\\ai-game，游戏范围 1-100，最多 10 次尝试，支持重玩功能。\",\n    \"createdAt\": \"2026-04-04T03:21:36.278Z\"\n  }\n]\n```",
+      "timestamp": "2026-04-04T08:42:54.533Z"
+    }
+  ]
+}
