@@ -1,14 +1,92 @@
 [
   {
-    "id": "9a55f2e2",
+    "id": "u001",
     "category": "profile",
-    "content": "用户的名字是 Frees Ling。",
-    "createdAt": "2026-04-03T12:32:53.210Z"
+    "content": "用户名字是 Frees Ling，喜欢被称为 Frees 或 Ling。",
+    "createdAt": "2026-04-04T16:00:00Z"
   },
   {
-    "id": "17ce90c3",
+    "id": "u002",
+    "category": "interest",
+    "content": "用户对编程、人工智能、数据库和算法非常感兴趣。",
+    "createdAt": "2026-04-04T16:00:00Z"
+  },
+  {
+    "id": "u003",
+    "category": "personality",
+    "content": "用户心理年龄约17岁，性格既可社恐也可社牛，喜欢新鲜事物。",
+    "createdAt": "2026-04-04T16:00:00Z"
+  },
+  {
+    "id": "u004",
     "category": "project",
-    "content": "用户正在开发一个 Rust 猜数字小游戏项目，目录：C:\\Users\\lenovo\\Desktop\\ai-game，游戏范围 1-100，最多 10 次尝试，支持重玩功能。",
-    "createdAt": "2026-04-04T03:21:36.278Z"
+    "content": "用户正在开发 AI Agent 与 MAVSDK 无人机控制项目。",
+    "createdAt": "2026-04-04T16:00:00Z"
+  },
+  {
+    "id": "user_learning_01",
+    "category": "education",
+    "content": "用户高中时期非常热爱化学，经常自己做实验，并自学过大学的无机化学、分析化学以及部分有机化学内容。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_learning_02",
+    "category": "education",
+    "content": "用户对数学非常痴迷，并认为数学是一门既有趣又充满逻辑美感的学科。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_learning_03",
+    "category": "interest",
+    "content": "用户喜欢计算机编程，因为程序可以实现他的各种想法。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_hobby_01",
+    "category": "hobby",
+    "content": "用户曾经非常喜欢摄影，高中时期为学校公众号拍摄照片，并担任过摄影社社长。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_game_01",
+    "category": "interest",
+    "content": "用户非常喜欢 Undertale，并认为这个游戏的友谊故事对他的价值观产生过影响。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_game_02",
+    "category": "interest",
+    "content": "用户非常喜欢 Sonic（索尼克）系列，高中时期的绰号就是 Sonic。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_personality_01",
+    "category": "personality",
+    "content": "用户性格比较纯真，重视友谊和情感，对关系和感情十分认真。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_values_01",
+    "category": "values",
+    "content": "用户认为未来和稳定发展比单纯兴趣更重要，希望不断向上学习和成长。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_pet_memory",
+    "category": "memory",
+    "content": "用户小时候养过一只很聪明的狗，后来走失了，这件事情对他影响很深。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_social_01",
+    "category": "relationship",
+    "content": "用户与朋友雨轩关系很好，经常聊天和分享生活。",
+    "createdAt": "2026-04-04T16:40:00Z"
+  },
+  {
+    "id": "user_travel_01",
+    "category": "interest",
+    "content": "用户很希望未来能和喜欢的人一起去旅行。",
+    "createdAt": "2026-04-04T16:40:00Z"
   }
 ]
