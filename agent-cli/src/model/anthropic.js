@@ -7,7 +7,7 @@ export class AnthropicClient {
     this.model = model;
   }
 
-  async generateText({ systemPrompt, messages, temperature = 0.2, maxOutputTokens = 4000 }) {
+  async generateText({ systemPrompt, messages, temperature = 0.2, maxOutputTokens = 200000 }) {
     if (!this.apiKey) {
       throw new Error('Anthropic provider 需要 API Key');
     }
