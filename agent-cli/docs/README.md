@@ -16,6 +16,8 @@
   欠拟合、过拟合、灾难性遗忘、显存不足、格式问题等。
 - `06-如何加载模型与接入自己的模型或云端API.md`
   如何在 `Frees Agent` 里配置本地模型、OpenAI 兼容 API、Anthropic API，以及如何在代码里增加新的 provider。
+- `16-如何接入MCP外部工具.md`
+  如何将外部 MCP 工具与 `Frees Agent` 结合使用，并在配置中完成集成。
 - `07-Frees-Agent记忆与超长对话.md`
   `Frees Agent` 的长期记忆、用户画像、会话持久化和超长对话摘要压缩机制。
 - `08-数据集构建清洗标注与评测.md`

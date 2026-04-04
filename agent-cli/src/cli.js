@@ -39,7 +39,7 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
   frees-agent skills [skill-name]
 
 通用参数：
-  --provider anthropic|ollama|openai-compatible
+  --provider anthropic|ollama|openai-compatible|mcp
   --model <name>
   --base-url <url>
   --api-key <key>

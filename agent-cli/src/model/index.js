@@ -19,9 +19,14 @@ export async function resolveModelRuntime(options = {}) {
   const providerName = options.provider || config.defaultProvider || 'ollama';
   const providerConfig = config.providers?.[providerName] || {};
   const model = options.model || providerConfig.model || config.defaultModel;
+  const mcpServerConfig =
+    providerName === 'mcp' && providerConfig.server
+      ? config.mcpServers?.[providerConfig.server]
+      : undefined;
   const baseUrl =
     options.baseUrl ||
     providerConfig.baseUrl ||
+    mcpServerConfig?.baseUrl ||
     (providerName === 'ollama'
       ? 'http://127.0.0.1:11434'
       : providerName === 'anthropic'
@@ -59,7 +64,7 @@ export async function createModelClient(options = {}) {
       apiKey: runtime.apiKey,
       model: runtime.model
     });
-  } else if (runtime.providerName === 'openai-compatible') {
+  } else if (runtime.providerName === 'openai-compatible' || runtime.providerName === 'mcp') {
     client = new OpenAICompatibleClient({
       baseUrl: runtime.baseUrl,
       apiKey: runtime.apiKey,

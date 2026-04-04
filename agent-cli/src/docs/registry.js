@@ -41,6 +41,11 @@ export const DOCS = [
     filename: '06-如何加载模型与接入自己的模型或云端API.md'
   },
   {
+    slug: 'mcp-integration',
+    title: '如何接入 MCP 外部工具并配置 Frees Agent',
+    filename: '16-如何接入MCP外部工具.md'
+  },
+  {
     slug: 'memory-long-chat',
     title: 'Frees Agent 的记忆系统与超长对话',
     filename: '07-Frees-Agent记忆与超长对话.md'

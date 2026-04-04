@@ -18,6 +18,22 @@ const DEFAULT_CONFIG = {
       baseUrl: 'https://api.anthropic.com',
       apiKeyEnv: 'ANTHROPIC_API_KEY',
       model: 'claude-sonnet-4-5'
+    },
+    mcp: {
+      baseUrl: 'http://127.0.0.1:1234/v1',
+      apiKeyEnv: 'OPENAI_API_KEY',
+      model: 'your-model-name',
+      server: 'tavily'
+    }
+  },
+  mcpServers: {
+    tavily: {
+      command: 'npx',
+      args: ['@tavily/mcp'],
+      env: {
+        TAVILY_API_KEY: 'YOUR_TAVILY_API_KEY'
+      },
+      baseUrl: 'http://127.0.0.1:1234/v1'
     }
   },
   localModels: [
