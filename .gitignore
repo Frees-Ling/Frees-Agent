@@ -1,3 +1,6 @@
 .idea
 
 .frees-agent
+
+node_modules
+agent-cli/node_modules

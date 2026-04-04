@@ -7,3 +7,10 @@ main().catch(error => {
   console.error(`[Frees Agent] ${message}`);
   process.exitCode = 1;
 });
+
+// const cli = require('../dist/frees-agent.js');
+
+// cli.main(process.argv.slice(2)).catch(err => {
+//   console.error('[Frees Agent]', err);
+//   process.exit(1);
+// });
