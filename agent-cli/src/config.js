@@ -12,7 +12,7 @@ const DEFAULT_CONFIG = {
     'openai-compatible': {
       baseUrl: 'http://192.168.2.5:1202/v1',// http://127.0.0.1:1234/v1
       apiKeyEnv: 'OPENAI_API_KEY',
-      model: 'motified-model'
+      model: 'zai-org/glm-4.7-flash'
     },
     anthropic: {
       baseUrl: 'https://api.anthropic.com',
