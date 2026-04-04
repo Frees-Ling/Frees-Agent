@@ -3,6 +3,8 @@
   "goals": [],
   "preferences": [],
   "skills": [],
-  "stack": [],
+  "stack": [
+    "Rust"
+  ],
   "constraints": []
 }

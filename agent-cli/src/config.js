@@ -21,8 +21,8 @@ const DEFAULT_CONFIG = {
     },
     mcp: {
       baseUrl: 'http://127.0.0.1:1234/v1',
-      apiKeyEnv: 'OPENAI_API_KEY',
-      model: 'your-model-name',
+      apiKeyEnv: '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',
+      model: 'qwen/qwen3.5-9b',
       server: 'tavily'
     }
   },
