@@ -1,42 +1,10 @@
 {
   "name": "Frees Ling",
-  "goals": [
-    "成为全栈开发工程师",
-    "不断向上学习并提升自己的能力",
-    "未来能够实现稳定发展并发展自己的兴趣"
-  ],
-  "preferences": [
-    "喜欢深入讨论技术和原理",
-    "喜欢逻辑清晰和系统性的解释",
-    "喜欢通过实践和项目学习技术"
-  ],
-  "skills": [
-    "Git",
-    "数据库开发",
-    "QQBot开发",
-    "Python",
-    "C/C++",
-    "基础化学实验",
-    "摄影"
-  ],
+  "goals": [],
+  "preferences": [],
+  "skills": [],
   "stack": [
-    "Rust",
-    "Python",
-    "C++",
-    "Git",
-    "VSCode"
-  ],
-  "interests": [
-    "编程",
-    "人工智能",
-    "算法",
-    "数学",
-    "化学",
-    "摄影",
-    "Undertale",
-    "Sonic",
-    "Furry文化",
-    "旅行"
+    "Rust"
   ],
   "constraints": []
 }
