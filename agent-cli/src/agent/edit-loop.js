@@ -26,7 +26,7 @@ export async function runEditAgent({
   maxSteps = 14,
   dryRun = false,
   temperature = 0.2,
-  maxOutputTokens = 4000,
+  maxOutputTokens = 16000,
   verbose = false
 }) {
   if (!index) {

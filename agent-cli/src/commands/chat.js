@@ -2,7 +2,11 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { buildChatUserPrompt, CHAT_SYSTEM_PROMPT } from '../agent/prompts.js';
+import { buildExecutionPlan, reflectAndRevise } from '../agent/reasoning.js';
+import { runChatToolAgent } from '../agent/chat-tool-loop.js';
+import { createAgentToolbox } from '../agent/tools.js';
 import {
+  attachSemanticMemoriesToState,
   buildChatSystemPrompt,
   compactConversationIfNeeded,
   describeMemoryState,
@@ -10,8 +14,9 @@ import {
 } from '../memory/manager.js';
 import { resolveLocalChatShortcut } from '../memory/heuristics.js';
 import { createMemoryStore, getRecentMessagesForModel, loadMemoryState, saveMemoryState } from '../memory/store.js';
-import { createModelClient } from '../model/index.js';
+import { createModelClient, createRoleModelClient } from '../model/index.js';
 import { formatSkillContext, loadSkills, selectRelevantSkills } from '../skills/loader.js';
+import { searchWebWithTavily, shouldUseWebSearch } from '../tools/web-search.js';
 import { printFreesAgentBanner } from '../ui/banner.js';
 import { runEditCommand } from './edit.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
@@ -42,6 +47,18 @@ export async function runChatCommand(options) {
     sessionName: options.session || runtime.config.conversation?.defaultSessionName
   });
   const memoryState = await loadMemoryState(memoryStore, runtime.config);
+  let plannerClient = null;
+  let criticClient = null;
+  try {
+    plannerClient = (await createRoleModelClient(options, 'planner')).client;
+  } catch {
+    plannerClient = client;
+  }
+  try {
+    criticClient = (await createRoleModelClient(options, 'critic')).client;
+  } catch {
+    criticClient = client;
+  }
 
   if (options.resetSession) {
     memoryState.session.summary = '';
@@ -67,14 +84,51 @@ export async function runChatCommand(options) {
     }
 
     const relevantFiles = index ? findRelevantFiles(index, message) : [];
+    await attachSemanticMemoriesToState({
+      state: memoryState,
+      query: message,
+      config: runtime.config
+    });
     const relevantSkills = availableSkills.length
       ? selectRelevantSkills(availableSkills, message)
       : [];
+    const planningHint = await buildExecutionPlan({
+      plannerClient,
+      message,
+      workspaceOverview,
+      enabled: runtime.config.conversation?.planningEnabled !== false
+    });
+    let webHint = '';
+    if (
+      runtime.config.tools?.webSearch?.enabled !== false &&
+      shouldUseWebSearch(message) &&
+      ['ollama', 'openai-compatible', 'mcp'].includes(runtime.providerName)
+    ) {
+      try {
+        const web = await searchWebWithTavily(message, runtime.config, {
+          maxResults: runtime.config.tools?.webSearch?.maxResults ?? 5
+        });
+        webHint = [
+          web.answer ? `摘要: ${web.answer}` : '',
+          ...(web.results || []).map(item => `- ${item.title} (${item.url}) ${item.content}`)
+        ]
+          .filter(Boolean)
+          .join('\n');
+      } catch (error) {
+        webHint = `联网检索失败: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
     const prompt = buildChatUserPrompt({
       message,
       workspaceOverview,
       relevantFiles,
-      skillContext: formatSkillContext(relevantSkills)
+      skillContext: [
+        formatSkillContext(relevantSkills),
+        planningHint ? `\n${planningHint}` : '',
+        webHint ? `\n联网信息:\n${webHint}` : ''
+      ]
+        .filter(Boolean)
+        .join('\n')
     });
     const systemPrompt = buildChatSystemPrompt({
       baseSystemPrompt: CHAT_SYSTEM_PROMPT,
@@ -85,12 +139,36 @@ export async function runChatCommand(options) {
       systemPrompt,
       messages: [...getRecentMessagesForModel(memoryState), { role: 'user', content: prompt }],
       temperature: options.temperature,
-      maxOutputTokens: options.maxOutputTokens
+      maxOutputTokens:
+        options.maxOutputTokens ??
+        runtime.config.conversation?.maxOutputTokens ??
+        16000
     };
     let reply = '';
     let streamed = false;
+    const useChatTools = runtime.config.tools?.enabledInChat !== false;
 
-    if (streamResponses && typeof client.streamText === 'function') {
+    if (useChatTools && index) {
+      const toolbox = createAgentToolbox(index, {
+        readOnly: true,
+        config: runtime.config
+      });
+      reply = await runChatToolAgent({
+        client,
+        toolbox,
+        message,
+        workspaceOverview,
+        relevantFiles,
+        memoryHint: memoryState.session.summary || '',
+        planningHint,
+        webHint,
+        temperature: options.temperature ?? 0.1,
+        maxOutputTokens:
+          options.maxOutputTokens ??
+          runtime.config.conversation?.maxOutputTokens ??
+          16000
+      });
+    } else if (streamResponses && typeof client.streamText === 'function') {
       streamed = true;
       reply = await client.streamText({
         ...request,
@@ -101,6 +179,43 @@ export async function runChatCommand(options) {
       output.write('\n');
     } else {
       reply = await client.generateText(request);
+    }
+
+    if (
+      !streamed &&
+      runtime.config.conversation?.reflectionEnabled !== false &&
+      reply
+    ) {
+      reply = await reflectAndRevise({
+        criticClient,
+        userMessage: message,
+        draftReply: reply,
+        enabled: true
+      });
+    }
+
+    if (
+      !streamed &&
+      runtime.config.conversation?.autoContinueOnCutoff !== false &&
+      reply.length > 1000 &&
+      !/[。.!！?？]\s*$/.test(reply)
+    ) {
+      const continuation = await client.generateText({
+        systemPrompt,
+        messages: [
+          ...request.messages,
+          { role: 'assistant', content: reply },
+          {
+            role: 'user',
+            content: '请从上文中断处继续，避免重复已输出内容。'
+          }
+        ],
+        temperature: options.temperature,
+        maxOutputTokens: Math.min(request.maxOutputTokens || 16000, 6000)
+      });
+      if (continuation) {
+        reply = `${reply}\n${continuation}`;
+      }
     }
 
     await updateMemoryAfterTurn({
@@ -161,6 +276,7 @@ export async function runChatCommand(options) {
         console.log('/memory     查看当前持久化记忆');
         console.log('/profile    查看当前用户画像');
         console.log('/summary    查看长对话摘要');
+        console.log('/tasks      查看任务记忆');
         console.log('/skills     查看当前加载的 skill 文件');
         console.log('/stream on  开启实时流式输出');
         console.log('/stream off 关闭实时流式输出');
@@ -179,6 +295,17 @@ export async function runChatCommand(options) {
 
       if (line === '/summary') {
         console.log(memoryState.session.summary || '当前还没有长对话摘要。');
+        continue;
+      }
+
+      if (line === '/tasks') {
+        if (!memoryState.tasks?.length) {
+          console.log('当前没有任务记忆。');
+        } else {
+          for (const task of memoryState.tasks.slice(0, 20)) {
+            console.log(`- [${task.status}] ${task.title}`);
+          }
+        }
         continue;
       }
 

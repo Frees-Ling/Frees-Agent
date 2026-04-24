@@ -1,6 +1,8 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { isLikelyValidName, sanitizeProfilePatch } from './heuristics.js';
+import { normalizeDurableMemories, routeMemoryExtraction } from './ingest.js';
+import { loadTaskMemory, mergeTasks } from './tasks.js';
 import { shortHash, slugify } from '../utils/slug.js';
 
 function isObject(value) {
@@ -34,11 +36,7 @@ function mergeProfile(base = {}, patch = {}) {
 }
 
 function sanitizeDurableMemories(memories = []) {
-  if (!Array.isArray(memories)) {
-    return [];
-  }
-
-  return memories.filter(memory => {
+  return normalizeDurableMemories(memories).filter(memory => {
     const category = String(memory?.category || '').trim();
     const content = String(memory?.content || '').trim();
     if (!content) {
@@ -95,6 +93,8 @@ export async function createMemoryStore({ configPath, workspaceRoot, sessionName
     sessionsDir: path.join(storageRoot, 'sessions'),
     profilePath: path.join(storageRoot, 'memory', 'profile.json'),
     durableMemoryPath: path.join(storageRoot, 'memory', 'durable-memories.json'),
+    vectorMemoryPath: path.join(storageRoot, 'memory', 'vector-memories.json'),
+    taskMemoryPath: path.join(storageRoot, 'memory', 'task-memory.json'),
     sessionPath: path.join(storageRoot, 'sessions', `${sessionId}.json`),
     sessionId,
     sessionName: sessionName || 'default',
@@ -107,10 +107,51 @@ export async function createMemoryStore({ configPath, workspaceRoot, sessionName
   return store;
 }
 
+function resolveSyncRoots(store, config) {
+  const roots = [store.storageRoot];
+  if (config?.memory?.autoMergeAcrossDevices !== false) {
+    for (const value of config?.memory?.syncRoots || []) {
+      const candidate = path.resolve(String(value || '').trim());
+      if (candidate && !roots.includes(candidate)) {
+        roots.push(candidate);
+      }
+    }
+  }
+  return roots;
+}
+
+function mergeSessions(base, patch) {
+  const nextBase = base || {};
+  if (!patch) {
+    return nextBase;
+  }
+  const mergedMessages = [...(nextBase.recentMessages || []), ...(patch.recentMessages || [])];
+  const deduped = [];
+  const seen = new Set();
+  for (const message of mergedMessages) {
+    const key = `${message?.role}::${message?.timestamp}::${message?.content}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(message);
+    }
+  }
+  deduped.sort((left, right) =>
+    String(left?.timestamp || '').localeCompare(String(right?.timestamp || ''))
+  );
+
+  return {
+    ...nextBase,
+    ...patch,
+    summary: [nextBase.summary, patch.summary].filter(Boolean).join('\n\n').trim(),
+    totalTurns: Math.max(nextBase.totalTurns || 0, patch.totalTurns || 0),
+    recentMessages: deduped
+  };
+}
+
 export async function loadMemoryState(store, config) {
-  const profile = sanitizeProfilePatch(await readJson(store.profilePath, {}));
-  const durableMemories = sanitizeDurableMemories(await readJson(store.durableMemoryPath, []));
-  const session = await readJson(store.sessionPath, {
+  let profile = {};
+  let durableMemories = [];
+  let session = {
     id: store.sessionId,
     name: store.sessionName,
     workspaceRoot: store.workspaceRoot,
@@ -119,14 +160,38 @@ export async function loadMemoryState(store, config) {
     totalTurns: 0,
     summary: '',
     recentMessages: []
-  });
+  };
+  let tasks = [];
+
+  for (const root of resolveSyncRoots(store, config)) {
+    const sourceProfile = sanitizeProfilePatch(
+      await readJson(path.join(root, 'memory', 'profile.json'), {})
+    );
+    profile = mergeProfile(profile, sourceProfile);
+
+    const sourceDurable = sanitizeDurableMemories(
+      await readJson(path.join(root, 'memory', 'durable-memories.json'), [])
+    );
+    durableMemories = sanitizeDurableMemories([...durableMemories, ...sourceDurable]);
+
+    const sourceSession = await readJson(
+      path.join(root, 'sessions', `${store.sessionId}.json`),
+      null
+    );
+    session = mergeSessions(session, sourceSession);
+
+    const sourceTask = await loadTaskMemory(path.join(root, 'memory', 'task-memory.json'));
+    tasks = mergeTasks(tasks, sourceTask.tasks || []);
+  }
 
   return {
     config,
     store,
     profile,
     durableMemories,
-    session
+    session,
+    tasks,
+    semanticMemories: []
   };
 }
 
@@ -134,21 +199,29 @@ export async function saveMemoryState(state) {
   state.session.updatedAt = new Date().toISOString();
   state.profile = sanitizeProfilePatch(state.profile);
   state.durableMemories = sanitizeDurableMemories(state.durableMemories);
-  await writeJson(state.store.profilePath, state.profile);
-  await writeJson(state.store.durableMemoryPath, state.durableMemories);
-  await writeJson(state.store.sessionPath, state.session);
+  const roots = resolveSyncRoots(state.store, state.config);
+  const writeRoots =
+    state.config?.memory?.syncWritesToRoots === true ? roots : [state.store.storageRoot];
+
+  for (const root of writeRoots) {
+    await writeJson(path.join(root, 'memory', 'profile.json'), state.profile);
+    await writeJson(path.join(root, 'memory', 'durable-memories.json'), state.durableMemories);
+    await writeJson(path.join(root, 'sessions', `${state.store.sessionId}.json`), state.session);
+  }
 }
 
 export function mergeMemoryExtraction(state, extraction, config) {
-  if (extraction?.profilePatch) {
-    state.profile = mergeProfile(state.profile, sanitizeProfilePatch(extraction.profilePatch));
+  const routed = routeMemoryExtraction(extraction);
+
+  if (routed?.profilePatch) {
+    state.profile = mergeProfile(state.profile, sanitizeProfilePatch(routed.profilePatch));
   }
 
-  if (Array.isArray(extraction?.durableMemories)) {
+  if (Array.isArray(routed?.durableMemories)) {
     const seen = new Set(
       state.durableMemories.map(item => `${item.category}::${item.content}`)
     );
-    for (const memory of sanitizeDurableMemories(extraction.durableMemories)) {
+    for (const memory of sanitizeDurableMemories(routed.durableMemories)) {
       const content = String(memory?.content || '').trim();
       const category = String(memory?.category || 'profile').trim() || 'profile';
       if (!content) {
@@ -223,6 +296,78 @@ export async function listSessions(storeRoot) {
     }
     throw error;
   }
+}
+
+export async function listSessionsAcrossRoots(store, config) {
+  const names = new Set();
+  for (const root of resolveSyncRoots(store, config)) {
+    const sessions = await listSessions(root);
+    for (const name of sessions) {
+      names.add(name);
+    }
+  }
+  return Array.from(names).sort();
+}
+
+function createEmptySession(store) {
+  return {
+    id: store.sessionId,
+    name: store.sessionName,
+    workspaceRoot: store.workspaceRoot,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    totalTurns: 0,
+    summary: '',
+    recentMessages: []
+  };
+}
+
+export async function mergeAllSessionsForStore(store, config) {
+  let merged = createEmptySession(store);
+  let mergedFileCount = 0;
+  const roots = resolveSyncRoots(store, config);
+
+  for (const root of roots) {
+    const sessionsDir = path.join(root, 'sessions');
+    let entries = [];
+    try {
+      entries = await readdir(sessionsDir);
+    } catch (error) {
+      if (!error || typeof error !== 'object' || error.code !== 'ENOENT') {
+        throw error;
+      }
+      entries = [];
+    }
+
+    for (const entry of entries) {
+      if (!entry.endsWith('.json')) {
+        continue;
+      }
+      const filePath = path.join(sessionsDir, entry);
+      const session = await readJson(filePath, null);
+      if (!session) {
+        continue;
+      }
+      merged = mergeSessions(merged, session);
+      mergedFileCount += 1;
+    }
+  }
+
+  if (!merged.id) {
+    merged.id = store.sessionId;
+  }
+  if (!merged.name) {
+    merged.name = store.sessionName;
+  }
+  if (!merged.workspaceRoot) {
+    merged.workspaceRoot = store.workspaceRoot;
+  }
+  merged.updatedAt = new Date().toISOString();
+
+  return {
+    mergedSession: merged,
+    mergedFileCount
+  };
 }
 
 export async function clearAllSessionFiles(storeRoot) {

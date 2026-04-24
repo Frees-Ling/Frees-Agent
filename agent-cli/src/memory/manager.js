@@ -1,11 +1,15 @@
 import { extractFirstJsonObject, truncateForModel } from '../utils/json.js';
+import { estimateMessagesTokens } from '../utils/tokens.js';
 import { inferLocalMemory } from './heuristics.js';
+import { extractProfileFromText, mergeMemoryExtractions } from './ingest.js';
+import { inferTasksFromMessage, mergeTasks, saveTaskMemory } from './tasks.js';
 import {
   appendTurnToSession,
   getRecentMessagesForModel,
   mergeMemoryExtraction,
   saveMemoryState
 } from './store.js';
+import { queryVectorMemories, upsertDurableMemoriesToVectorIndex } from './vector.js';
 import {
   buildMemoryContext,
   buildMemoryExtractionPrompt,
@@ -41,7 +45,9 @@ export function buildChatSystemPrompt({ baseSystemPrompt, state, config }) {
     profile: config?.memory?.includeUserProfile === false ? {} : state.profile,
     durableMemories:
       config?.memory?.includeDurableMemories === false ? [] : state.durableMemories,
-    sessionSummary: state.session.summary
+    sessionSummary: state.session.summary,
+    semanticMemories: state.semanticMemories || [],
+    tasks: state.tasks || []
   });
 
   if (!memoryContext) {
@@ -60,9 +66,20 @@ export async function updateMemoryAfterTurn({
   temperature = 0
 }) {
   appendTurnToSession(state, userMessage, assistantMessage);
-  mergeMemoryExtraction(state, inferLocalMemory(userMessage), config);
+  mergeMemoryExtraction(
+    state,
+    mergeMemoryExtractions(
+      inferLocalMemory(userMessage),
+      {
+        profilePatch: extractProfileFromText(userMessage)
+      }
+    ),
+    config
+  );
+  state.tasks = mergeTasks(state.tasks || [], inferTasksFromMessage(userMessage));
 
   if (config?.memory?.enabled === false || config?.memory?.autoExtract === false) {
+    await saveTaskMemory(state.store.taskMemoryPath, state.tasks || []);
     await saveMemoryState(state);
     return;
   }
@@ -85,12 +102,35 @@ export async function updateMemoryAfterTurn({
       maxOutputTokens: 1200
     });
     const extraction = extractFirstJsonObject(raw);
-    mergeMemoryExtraction(state, extraction, config);
+    mergeMemoryExtraction(state, mergeMemoryExtractions(extraction), config);
   } catch {
     // Ignore extraction failures to avoid breaking the main chat loop.
   }
 
+  if (config?.memory?.vectorMemory?.enabled !== false) {
+    await upsertDurableMemoriesToVectorIndex(
+      state.store.vectorMemoryPath,
+      state.durableMemories || []
+    );
+  }
+  await saveTaskMemory(state.store.taskMemoryPath, state.tasks || []);
   await saveMemoryState(state);
+}
+
+export async function attachSemanticMemoriesToState({
+  state,
+  query,
+  config
+}) {
+  if (config?.memory?.vectorMemory?.enabled === false) {
+    state.semanticMemories = [];
+    return;
+  }
+  state.semanticMemories = await queryVectorMemories(
+    state.store.vectorMemoryPath,
+    query,
+    config?.memory?.vectorMemory?.topK ?? 6
+  );
 }
 
 export async function compactConversationIfNeeded({
@@ -101,8 +141,13 @@ export async function compactConversationIfNeeded({
 }) {
   const threshold = config?.conversation?.summarizeAfterMessages ?? 18;
   const keepRecentMessages = config?.conversation?.keepRecentMessages ?? 12;
+  const tokenThreshold = config?.conversation?.maxRecentContextTokens ?? 12000;
+  const recentTokenEstimate = estimateMessagesTokens(state.session.recentMessages || []);
 
-  if ((state.session.recentMessages || []).length <= threshold) {
+  if (
+    (state.session.recentMessages || []).length <= threshold &&
+    recentTokenEstimate <= tokenThreshold
+  ) {
     return;
   }
 
@@ -153,6 +198,8 @@ export function describeMemoryState(state) {
       storageRoot: state.store.storageRoot,
       profilePath: state.store.profilePath,
       durableMemoryPath: state.store.durableMemoryPath,
+      vectorMemoryPath: state.store.vectorMemoryPath,
+      taskMemoryPath: state.store.taskMemoryPath,
       sessionPath: state.store.sessionPath
     },
     profile: state.profile,
@@ -163,6 +210,8 @@ export function describeMemoryState(state) {
       totalTurns: state.session.totalTurns,
       summary: state.session.summary,
       recentMessages: getRecentMessagesForModel(state)
-    }
+    },
+    semanticMemories: state.semanticMemories || [],
+    tasks: state.tasks || []
   };
 }

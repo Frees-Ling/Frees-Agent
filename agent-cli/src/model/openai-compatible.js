@@ -19,7 +19,7 @@ export class OpenAICompatibleClient {
     this.model = model;
   }
 
-  async generateText({ systemPrompt, messages, temperature = 0.2, maxOutputTokens = 4000 }) {
+  async generateText({ systemPrompt, messages, temperature = 0.2, maxOutputTokens = 16000 }) {
     const payload = {
       model: this.model,
       temperature,
@@ -59,7 +59,7 @@ export class OpenAICompatibleClient {
     systemPrompt,
     messages,
     temperature = 0.2,
-    maxOutputTokens = 4000,
+    maxOutputTokens = 16000,
     onToken
   }) {
     const payload = {

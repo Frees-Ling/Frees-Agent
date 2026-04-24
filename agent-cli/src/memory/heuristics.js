@@ -1,3 +1,5 @@
+import { extractProfileFromText, normalizeProfilePatch as normalizeProfilePatchByIngest } from './ingest.js';
+
 function cleanCapture(value) {
   return String(value || '')
     .trim()
@@ -56,7 +58,7 @@ export function sanitizeProfilePatch(profile = {}) {
     return {};
   }
 
-  const next = { ...profile };
+  const next = normalizeProfilePatchByIngest(profile);
   if ('name' in next) {
     const normalizedName = normalizeNameCandidate(next.name);
     if (isLikelyValidName(normalizedName)) {
@@ -156,7 +158,15 @@ export function inferLocalMemory(userMessage) {
     });
   }
 
-  return { profilePatch, durableMemories };
+  const inferredPatch = extractProfileFromText(userMessage);
+  const mergedPatch = sanitizeProfilePatch({
+    ...inferredPatch,
+    ...profilePatch,
+    goals: [...(inferredPatch.goals || []), ...(profilePatch.goals || [])],
+    preferences: [...(inferredPatch.preferences || []), ...(profilePatch.preferences || [])]
+  });
+
+  return { profilePatch: mergedPatch, durableMemories };
 }
 
 export function resolveLocalChatShortcut(message, state) {

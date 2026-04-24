@@ -1,6 +1,7 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const __filename = process.argv[1];
+const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export const DOCS = [
@@ -88,6 +89,21 @@ export const DOCS = [
     slug: 'source-analysis',
     title: 'Frees Agent 项目源码逐文件逐函数剖析',
     filename: '15-Frees-Agent项目源码逐文件逐函数剖析.md'
+  },
+  {
+    slug: 'fast-project-editing',
+    title: '快速项目式改造执行指南',
+    filename: '17-快速项目式改造执行指南.md'
+  },
+  {
+    slug: 'agent-memory-architecture',
+    title: 'Agent Memory Architecture',
+    filename: '18-agent-memory-architecture.md'
+  },
+  {
+    slug: 'feature-config',
+    title: '自动联网与新功能配置指南',
+    filename: '19-自动联网与新功能配置指南.md'
   }
 ];
 

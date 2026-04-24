@@ -6,7 +6,7 @@ export class OllamaClient {
     this.model = model;
   }
 
-  async generateText({ systemPrompt, messages, temperature = 0.2, maxOutputTokens = 4000 }) {
+  async generateText({ systemPrompt, messages, temperature = 0.2, maxOutputTokens = 16000 }) {
     let json;
     try {
       json = await postJson(`${this.baseUrl}/api/chat`, {
@@ -43,7 +43,7 @@ export class OllamaClient {
     systemPrompt,
     messages,
     temperature = 0.2,
-    maxOutputTokens = 4000,
+    maxOutputTokens = 16000,
     onToken
   }) {
     let stream;

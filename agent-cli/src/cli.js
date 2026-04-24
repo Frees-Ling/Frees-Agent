@@ -33,7 +33,7 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
   frees-agent doctor [workspace] [--ping]
   frees-agent config init [--force]
   frees-agent config show
-  frees-agent memory show|clear|sessions
+  frees-agent memory show|clear|sessions|merge
   frees-agent docs [topic]
   frees-agent permissions
   frees-agent skills [skill-name]
@@ -45,6 +45,7 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
   --api-key <key>
   --api-key-env <ENV_NAME>
   --config <path>
+  --auto-provider / --no-auto-provider
   --temperature <number>
   --max-output-tokens <number>
   --stream / --no-stream
@@ -76,6 +77,8 @@ export async function main(argv = process.argv.slice(2)) {
         'api-key': { type: 'string' },
         'api-key-env': { type: 'string' },
         config: { type: 'string' },
+        'auto-provider': { type: 'boolean' },
+        'no-auto-provider': { type: 'boolean' },
         session: { type: 'string', short: 's' },
         'reset-session': { type: 'boolean' },
         stream: { type: 'boolean' },
@@ -101,6 +104,12 @@ export async function main(argv = process.argv.slice(2)) {
       apiKey: parsed.values['api-key'],
       apiKeyEnv: parsed.values['api-key-env'],
       configPath: parsed.values.config,
+      autoProvider:
+        parsed.values['no-auto-provider'] === true
+          ? false
+          : parsed.values['auto-provider'] === true
+            ? true
+            : undefined,
       session: parsed.values.session,
       resetSession: Boolean(parsed.values['reset-session']),
       stream:
@@ -137,6 +146,8 @@ export async function main(argv = process.argv.slice(2)) {
         'api-key': { type: 'string' },
         'api-key-env': { type: 'string' },
         config: { type: 'string' },
+        'auto-provider': { type: 'boolean' },
+        'no-auto-provider': { type: 'boolean' },
         temperature: { type: 'string' },
         'max-output-tokens': { type: 'string' },
         verbose: { type: 'boolean' },
@@ -163,6 +174,12 @@ export async function main(argv = process.argv.slice(2)) {
       apiKey: parsed.values['api-key'],
       apiKeyEnv: parsed.values['api-key-env'],
       configPath: parsed.values.config,
+      autoProvider:
+        parsed.values['no-auto-provider'] === true
+          ? false
+          : parsed.values['auto-provider'] === true
+            ? true
+            : undefined,
       temperature:
         parsed.values.temperature !== undefined
           ? Number(parsed.values.temperature)
@@ -190,6 +207,8 @@ export async function main(argv = process.argv.slice(2)) {
         'api-key': { type: 'string' },
         'api-key-env': { type: 'string' },
         config: { type: 'string' },
+        'auto-provider': { type: 'boolean' },
+        'no-auto-provider': { type: 'boolean' },
         temperature: { type: 'string' },
         'max-output-tokens': { type: 'string' },
         verbose: { type: 'boolean' },
@@ -212,6 +231,12 @@ export async function main(argv = process.argv.slice(2)) {
       apiKey: parsed.values['api-key'],
       apiKeyEnv: parsed.values['api-key-env'],
       configPath: parsed.values.config,
+      autoProvider:
+        parsed.values['no-auto-provider'] === true
+          ? false
+          : parsed.values['auto-provider'] === true
+            ? true
+            : undefined,
       temperature:
         parsed.values.temperature !== undefined
           ? Number(parsed.values.temperature)
@@ -238,6 +263,8 @@ export async function main(argv = process.argv.slice(2)) {
         'api-key': { type: 'string' },
         'api-key-env': { type: 'string' },
         config: { type: 'string' },
+        'auto-provider': { type: 'boolean' },
+        'no-auto-provider': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' }
       }
     });
@@ -256,6 +283,13 @@ export async function main(argv = process.argv.slice(2)) {
       apiKey: parsed.values['api-key'],
       apiKeyEnv: parsed.values['api-key-env'],
       configPath: parsed.values.config
+      ,
+      autoProvider:
+        parsed.values['no-auto-provider'] === true
+          ? false
+          : parsed.values['auto-provider'] === true
+            ? true
+            : undefined
     });
     return;
   }

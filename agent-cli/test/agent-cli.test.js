@@ -10,6 +10,7 @@ import {
   updateMemoryAfterTurn
 } from '../src/memory/manager.js';
 import { inferLocalMemory, resolveLocalChatShortcut } from '../src/memory/heuristics.js';
+import { extractProfileFromText, mergeMemoryExtractions } from '../src/memory/ingest.js';
 import { createMemoryStore, loadMemoryState, mergeMemoryExtraction } from '../src/memory/store.js';
 import { buildPermissionGuide } from '../src/system/permissions.js';
 import { loadSkills, selectRelevantSkills } from '../src/skills/loader.js';
@@ -255,6 +256,30 @@ test('local chat shortcut remembers and returns user name', () => {
 test('name questions are not extracted as user names', () => {
   const extraction = inferLocalMemory('你知道我叫什么名字吗');
   assert.equal(extraction.profilePatch.name, undefined);
+});
+
+test('profile extractor captures stack and skills', () => {
+  const patch = extractProfileFromText(
+    '我的技术栈是 Rust, TypeScript。我也会 Python开发，目标是做一个 AI Agent。'
+  );
+  assert.ok(patch.stack.includes('Rust'));
+  assert.ok(patch.skills.includes('Python'));
+  assert.ok(patch.goals.some(item => item.includes('做一个 AI Agent')));
+});
+
+test('memory extraction merge normalizes profile-like durable entries', () => {
+  const merged = mergeMemoryExtractions({
+    profilePatch: {},
+    durableMemories: [
+      { category: 'skill', content: 'Python开发' },
+      { category: 'skill', content: 'Python 编程' },
+      { category: 'goal', content: '构建 Frees Agent' }
+    ]
+  });
+
+  assert.equal(merged.profilePatch.skills.length, 1);
+  assert.equal(merged.profilePatch.skills[0], 'Python');
+  assert.equal(merged.durableMemories.length, 1);
 });
 
 test('self introduction gets an immediate local reply', () => {

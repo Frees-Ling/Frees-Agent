@@ -34,7 +34,10 @@ export async function runEditCommand(options) {
     maxSteps: options.maxSteps,
     dryRun: options.dryRun,
     temperature: options.temperature,
-    maxOutputTokens: options.maxOutputTokens,
+    maxOutputTokens:
+      options.maxOutputTokens ??
+      runtime.config.conversation?.maxOutputTokens ??
+      16000,
     verbose: options.verbose
   });
 

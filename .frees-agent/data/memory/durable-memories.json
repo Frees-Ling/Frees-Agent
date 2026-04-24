@@ -2,13 +2,13 @@
   {
     "id": "9a55f2e2",
     "category": "profile",
-    "content": "用户的名字是 Frees Ling。",
+    "content": "用户的名字是 Frees Ling",
     "createdAt": "2026-04-03T12:32:53.210Z"
   },
   {
     "id": "17ce90c3",
     "category": "project",
-    "content": "用户正在开发一个 Rust 猜数字小游戏项目，目录：C:\\Users\\lenovo\\Desktop\\ai-game，游戏范围 1-100，最多 10 次尝试，支持重玩功能。",
+    "content": "用户正在开发一个 Rust 猜数字小游戏项目，目录：C:\\Users\\lenovo\\Desktop\\ai-game，游戏范围 1-100，最多 10 次尝试，支持重玩功能",
     "createdAt": "2026-04-04T03:21:36.278Z"
   }
 ]

@@ -65,6 +65,44 @@ export const CHAT_SYSTEM_PROMPT = `
 如果系统中附带了用户画像、长期记忆或长对话摘要，请将它们作为高优先级上下文。
 `;
 
+export const CHAT_TOOL_SYSTEM_PROMPT = `
+你是带工具能力的终端助手。你必须只输出 JSON 对象：
+1) 调工具：
+{"type":"tool","tool":"list_files|search_text|read_file|web_search","args":{...},"reason":"..."}
+2) 结束：
+{"type":"final","reply":"给用户的最终回答"}
+
+规则：
+- 能直接回答就直接 final。
+- 需要事实依据时优先 web_search。
+- 需要项目代码上下文时使用 list_files/search_text/read_file。
+- 不要输出 JSON 以外的内容。
+`;
+
+export function buildChatToolUserPrompt({
+  message,
+  workspaceOverview,
+  relevantFiles,
+  memoryHint = '',
+  planningHint = '',
+  webHint = ''
+}) {
+  return `
+用户消息：
+${message}
+
+工作区概览：
+${workspaceOverview}
+
+${planningHint ? `${planningHint}\n` : ''}
+${memoryHint ? `记忆补充：\n${memoryHint}\n` : ''}
+${webHint ? `联网检索补充：\n${webHint}\n` : ''}
+
+相关文件片段：
+${formatRelevantFiles(relevantFiles, { maxCharsPerFile: 1800 })}
+`.trim();
+}
+
 export function buildChatUserPrompt({
   message,
   workspaceOverview,

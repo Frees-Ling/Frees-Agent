@@ -5,7 +5,9 @@ import {
   clearMemoryState,
   createMemoryStore,
   listSessions,
+  listSessionsAcrossRoots,
   loadMemoryState,
+  mergeAllSessionsForStore,
   saveMemoryState
 } from '../memory/store.js';
 
@@ -41,8 +43,21 @@ export async function runMemoryCommand(options) {
   }
 
   if (options.subcommand === 'sessions') {
-    const sessions = await listSessions(store.storageRoot);
+    const sessions =
+      config?.memory?.autoMergeAcrossDevices !== false
+        ? await listSessionsAcrossRoots(store, config)
+        : await listSessions(store.storageRoot);
     console.log(JSON.stringify(sessions, null, 2));
+    return;
+  }
+
+  if (options.subcommand === 'merge') {
+    const state = await loadMemoryState(store, config);
+    const { mergedSession, mergedFileCount } = await mergeAllSessionsForStore(store, config);
+    state.session = mergedSession;
+    await saveMemoryState(state);
+    console.log(`已完成 memory/sessions 合并，来源会话文件数: ${mergedFileCount}`);
+    console.log(`合并后消息数: ${state.session.recentMessages.length}`);
     return;
   }
 
@@ -50,4 +65,5 @@ export async function runMemoryCommand(options) {
   console.log('  frees-agent memory show [--session name]');
   console.log('  frees-agent memory clear [--all|--profile|--durable|--session-only]');
   console.log('  frees-agent memory sessions');
+  console.log('  frees-agent memory merge');
 }

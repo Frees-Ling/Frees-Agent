@@ -39,7 +39,10 @@ export async function runCompleteCommand(options) {
       }
     ],
     temperature: options.temperature ?? 0.1,
-    maxOutputTokens: options.maxOutputTokens ?? 3000
+    maxOutputTokens:
+      options.maxOutputTokens ??
+      runtime.config.conversation?.maxOutputTokens ??
+      16000
   });
 
   console.log(response);

@@ -78,15 +78,47 @@ const DEFAULT_CONFIG = {
     autoExtract: true,
     includeUserProfile: true,
     includeDurableMemories: true,
-    maxDurableMemories: 80
+    maxDurableMemories: 80,
+    autoMergeAcrossDevices: true,
+    syncRoots: [],
+    syncWritesToRoots: false,
+    vectorMemory: {
+      enabled: true,
+      topK: 6
+    }
   },
   conversation: {
     persistSessions: true,
     streamResponses: true,
+    maxOutputTokens: 16000,
     keepRecentMessages: 12,
     summarizeAfterMessages: 18,
+    maxRecentContextTokens: 12000,
     maxSummaryChars: 6000,
-    defaultSessionName: 'default'
+    defaultSessionName: 'default',
+    planningEnabled: true,
+    reflectionEnabled: true,
+    autoProviderFallback: true,
+    autoContinueOnCutoff: true
+  },
+  roles: {
+    planner: {
+      provider: '',
+      model: ''
+    },
+    critic: {
+      provider: '',
+      model: ''
+    }
+  },
+  tools: {
+    enabledInChat: true,
+    allowShellInChat: false,
+    webSearch: {
+      enabled: true,
+      provider: 'tavily',
+      maxResults: 5
+    }
   },
   systemIntegration: {
     computerControl: false,

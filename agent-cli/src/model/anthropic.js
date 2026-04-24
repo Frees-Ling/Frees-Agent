@@ -36,7 +36,7 @@ export class AnthropicClient {
     systemPrompt,
     messages,
     temperature = 0.2,
-    maxOutputTokens = 4000,
+    maxOutputTokens = 16000,
     onToken
   }) {
     if (!this.apiKey) {

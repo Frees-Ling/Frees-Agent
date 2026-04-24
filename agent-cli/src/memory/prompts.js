@@ -25,7 +25,8 @@ export const MEMORY_EXTRACT_SYSTEM_PROMPT = `
     "preferences": [],
     "skills": [],
     "stack": [],
-    "constraints": []
+    "constraints": [],
+    "interests": []
   },
   "durableMemories": [
     {
@@ -88,7 +89,13 @@ ${messagesToSummarize
 `.trim();
 }
 
-export function buildMemoryContext({ profile, durableMemories, sessionSummary }) {
+export function buildMemoryContext({
+  profile,
+  durableMemories,
+  sessionSummary,
+  semanticMemories = [],
+  tasks = []
+}) {
   const sections = [];
 
   if (profile && Object.keys(profile).length > 0) {
@@ -106,6 +113,23 @@ export function buildMemoryContext({ profile, durableMemories, sessionSummary })
 
   if (sessionSummary) {
     sections.push(`长对话摘要:\n${sessionSummary}`);
+  }
+
+  if (semanticMemories?.length) {
+    sections.push(
+      `语义召回记忆:\n${semanticMemories
+        .map((item, index) => `${index + 1}. [${item.category}] ${item.content}`)
+        .join('\n')}`
+    );
+  }
+
+  if (tasks?.length) {
+    sections.push(
+      `任务记忆:\n${tasks
+        .slice(0, 12)
+        .map((task, index) => `${index + 1}. [${task.status}] ${task.title}`)
+        .join('\n')}`
+    );
   }
 
   if (!sections.length) {

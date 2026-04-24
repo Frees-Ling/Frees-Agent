@@ -7,8 +7,9 @@ import {
   searchText,
   writeWorkspaceFile
 } from '../workspace/queries.js';
+import { searchWebWithTavily } from '../tools/web-search.js';
 
-export function createAgentToolbox(index, { dryRun = false } = {}) {
+export function createAgentToolbox(index, { dryRun = false, readOnly = false, config = {} } = {}) {
   const changes = [];
 
   async function runTool(name, args = {}) {
@@ -34,6 +35,9 @@ export function createAgentToolbox(index, { dryRun = false } = {}) {
     }
 
     if (name === 'mkdir') {
+      if (readOnly) {
+        throw new Error('当前工具箱为只读模式，禁止 mkdir。');
+      }
       if (dryRun) {
         const result = { ok: true, data: { path: args.path, dryRun: true } };
         changes.push({ type: 'mkdir', path: args.path, dryRun: true });
@@ -45,6 +49,9 @@ export function createAgentToolbox(index, { dryRun = false } = {}) {
     }
 
     if (name === 'write_file') {
+      if (readOnly) {
+        throw new Error('当前工具箱为只读模式，禁止 write_file。');
+      }
       if (dryRun) {
         const data = {
           path: args.path,
@@ -60,6 +67,9 @@ export function createAgentToolbox(index, { dryRun = false } = {}) {
     }
 
     if (name === 'replace_in_file') {
+      if (readOnly) {
+        throw new Error('当前工具箱为只读模式，禁止 replace_in_file。');
+      }
       if (dryRun) {
         const data = {
           path: args.path,
@@ -81,6 +91,9 @@ export function createAgentToolbox(index, { dryRun = false } = {}) {
     }
 
     if (name === 'delete_file') {
+      if (readOnly) {
+        throw new Error('当前工具箱为只读模式，禁止 delete_file。');
+      }
       if (dryRun) {
         const data = { path: args.path, dryRun: true };
         changes.push({ type: 'delete', path: args.path, dryRun: true });
@@ -88,6 +101,17 @@ export function createAgentToolbox(index, { dryRun = false } = {}) {
       }
       const data = await deleteWorkspaceFile(index, args.path);
       changes.push({ type: 'delete', path: args.path });
+      return { ok: true, data };
+    }
+
+    if (name === 'web_search') {
+      const query = String(args.query || '').trim();
+      if (!query) {
+        throw new Error('web_search 需要 query');
+      }
+      const data = await searchWebWithTavily(query, config, {
+        maxResults: args.maxResults
+      });
       return { ok: true, data };
     }
 
