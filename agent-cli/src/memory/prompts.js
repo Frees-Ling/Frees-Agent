@@ -97,16 +97,36 @@ export function buildMemoryContext({
   tasks = []
 }) {
   const sections = [];
+  const profileSummary = profile
+    ? {
+        name: profile.name,
+        nickname: profile.nickname,
+        goals: (profile.goals || []).slice(0, 6),
+        skills: (profile.skills || []).slice(0, 10),
+        stack: (profile.stack || []).slice(0, 10),
+        preferences: (profile.preferences || []).slice(0, 8),
+        interests: (profile.interests || []).slice(0, 8),
+        persona: profile.persona,
+        projects: profile?.projects?.current
+          ? { current: profile.projects.current.slice(0, 4) }
+          : undefined
+      }
+    : {};
 
   if (profile && Object.keys(profile).length > 0) {
-    sections.push(`用户画像:\n${JSON.stringify(profile, null, 2)}`);
+    sections.push(
+      `用户画像:\n${truncateForModel(JSON.stringify(profileSummary, null, 2), 2400)}`
+    );
   }
 
   if (durableMemories?.length) {
     sections.push(
       `长期记忆:\n${durableMemories
-        .slice(0, 20)
-        .map((item, index) => `${index + 1}. [${item.category}] ${item.content}`)
+        .slice(0, 10)
+        .map(
+          (item, index) =>
+            `${index + 1}. [${item.category}] ${truncateForModel(item.content || '', 140)}`
+        )
         .join('\n')}`
     );
   }
@@ -118,7 +138,11 @@ export function buildMemoryContext({
   if (semanticMemories?.length) {
     sections.push(
       `语义召回记忆:\n${semanticMemories
-        .map((item, index) => `${index + 1}. [${item.category}] ${item.content}`)
+        .slice(0, 6)
+        .map(
+          (item, index) =>
+            `${index + 1}. [${item.category}] ${truncateForModel(item.content || '', 140)}`
+        )
         .join('\n')}`
     );
   }
@@ -126,7 +150,7 @@ export function buildMemoryContext({
   if (tasks?.length) {
     sections.push(
       `任务记忆:\n${tasks
-        .slice(0, 12)
+        .slice(0, 8)
         .map((task, index) => `${index + 1}. [${task.status}] ${task.title}`)
         .join('\n')}`
     );

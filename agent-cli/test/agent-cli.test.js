@@ -417,6 +417,82 @@ test('openai-compatible streamText emits incremental tokens', async () => {
   }
 });
 
+test('openai-compatible qwen generateText disables thinking and strips think block', async () => {
+  const originalFetch = global.fetch;
+  let requestBody;
+  global.fetch = async (_url, init = {}) => {
+    requestBody = JSON.parse(String(init.body || '{}'));
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: '<think>internal</think>你好'
+            }
+          }
+        ]
+      }),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'application/json'
+        }
+      }
+    );
+  };
+
+  try {
+    const client = new OpenAICompatibleClient({
+      baseUrl: 'http://127.0.0.1:1234/v1',
+      model: 'qwen/qwen3.6-27b'
+    });
+
+    const reply = await client.generateText({
+      systemPrompt: 'test',
+      messages: [{ role: 'user', content: 'hi' }]
+    });
+
+    assert.equal(reply, '你好');
+    assert.equal(requestBody.chat_template_kwargs.enable_thinking, false);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('openai-compatible qwen streamText sends disable-thinking flag', async () => {
+  const originalFetch = global.fetch;
+  let requestBody;
+  global.fetch = async (_url, init = {}) => {
+    requestBody = JSON.parse(String(init.body || '{}'));
+    return new Response(
+      createChunkStream(['data: {"choices":[{"delta":{"content":"你好"}}]}\n\n', 'data: [DONE]\n\n']),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream'
+        }
+      }
+    );
+  };
+
+  try {
+    const client = new OpenAICompatibleClient({
+      baseUrl: 'http://127.0.0.1:1234/v1',
+      model: 'qwen3'
+    });
+
+    const reply = await client.streamText({
+      systemPrompt: 'test',
+      messages: [{ role: 'user', content: 'hi' }]
+    });
+
+    assert.equal(reply, '你好');
+    assert.equal(requestBody.chat_template_kwargs.enable_thinking, false);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('ollama streamText emits incremental tokens', async () => {
   const originalFetch = global.fetch;
   global.fetch = async () =>

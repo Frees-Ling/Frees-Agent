@@ -131,7 +131,11 @@ async function pingClient(client) {
     temperature: 0,
     maxOutputTokens: 16
   });
-  return String(response || '').trim();
+  const normalized = String(response || '').trim();
+  if (!normalized) {
+    throw new Error('连接探测失败：模型返回空内容。');
+  }
+  return normalized;
 }
 
 async function pingClientWithTimeout(client, timeoutMs = PROVIDER_PROBE_TIMEOUT_MS) {

@@ -18,6 +18,11 @@ function sanitizeVisibleText(text) {
     .trim();
 }
 
+function isQwen3ReasoningModel(model) {
+  const name = String(model || '').toLowerCase();
+  return /qwen\/qwen3|qwen3\./i.test(name) || /qwen3/i.test(name);
+}
+
 function extractAssistantText(json) {
   const message = json?.choices?.[0]?.message || {};
   const primary = normalizeMessageContent(message?.content);
@@ -44,6 +49,12 @@ export class OpenAICompatibleClient {
         }))
       ]
     };
+    if (isQwen3ReasoningModel(this.model)) {
+      payload.chat_template_kwargs = {
+        ...(payload.chat_template_kwargs || {}),
+        enable_thinking: false
+      };
+    }
 
     const requestOnce = async finalPayload =>
       postJson(`${this.baseUrl}/chat/completions`, {
@@ -115,6 +126,12 @@ export class OpenAICompatibleClient {
         }))
       ]
     };
+    if (isQwen3ReasoningModel(this.model)) {
+      payload.chat_template_kwargs = {
+        ...(payload.chat_template_kwargs || {}),
+        enable_thinking: false
+      };
+    }
 
     const requestStream = async finalPayload =>
       postStream(`${this.baseUrl}/chat/completions`, {

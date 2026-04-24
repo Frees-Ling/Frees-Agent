@@ -18,8 +18,11 @@ import { createModelClient, createRoleModelClient } from '../model/index.js';
 import { formatSkillContext, loadSkills, selectRelevantSkills } from '../skills/loader.js';
 import { searchWebWithTavily, shouldUseWebSearch } from '../tools/web-search.js';
 import { printFreesAgentBanner } from '../ui/banner.js';
+import { estimateMessagesTokens, estimateTokens } from '../utils/tokens.js';
 import { runEditCommand } from './edit.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
+
+const EMPTY_REPLY_FALLBACK = '我刚才没有收到模型的有效输出，请重试一次。';
 
 function shouldUseToolLoop(message) {
   const text = String(message || '').trim().toLowerCase();
@@ -43,6 +46,92 @@ function shouldUseToolLoop(message) {
     '代码改造'
   ];
   return toolKeywords.some(keyword => text.includes(keyword));
+}
+
+function isFallbackAssistantReply(text) {
+  return String(text || '').trim() === EMPTY_REPLY_FALLBACK;
+}
+
+function looksLikeReasoningLeak(text) {
+  const value = String(text || '').trim();
+  if (!value || value.length < 60) {
+    return false;
+  }
+
+  return [
+    /^here'?s a thinking process/i,
+    /^用户询问[“"]/,
+    /^根据系统提示/,
+    /回答策略[:：]/,
+    /最终回答将整合这些点/,
+    /Analyze User Input/i,
+    /Final Verification/i
+  ].some(pattern => pattern.test(value));
+}
+
+function normalizeHistoryOrder(messages = []) {
+  const cleaned = [];
+  for (const message of messages || []) {
+    const role = String(message?.role || '').trim();
+    const content = String(message?.content || '').trim();
+    if (!content) {
+      continue;
+    }
+    if (role !== 'user' && role !== 'assistant') {
+      continue;
+    }
+    if (role === 'assistant' && (isFallbackAssistantReply(content) || looksLikeReasoningLeak(content))) {
+      continue;
+    }
+    cleaned.push({
+      role,
+      content
+    });
+  }
+
+  while (cleaned.length && cleaned[0].role === 'assistant') {
+    cleaned.shift();
+  }
+
+  return cleaned;
+}
+
+function trimHistoryByBudget(messages = [], { maxTokens = 2800, maxMessages = 10 } = {}) {
+  const limitedByCount =
+    Number.isFinite(maxMessages) && maxMessages > 0 ? messages.slice(-maxMessages) : [...messages];
+  if (!limitedByCount.length) {
+    return [];
+  }
+
+  const safeBudget = Math.max(240, Number(maxTokens) || 0);
+  const selected = [];
+  let usedTokens = 0;
+
+  for (let index = limitedByCount.length - 1; index >= 0; index -= 1) {
+    const message = limitedByCount[index];
+    const messageTokens = estimateTokens(message.content) + 6;
+    if (usedTokens + messageTokens > safeBudget) {
+      if (!selected.length) {
+        const raw = String(message.content || '');
+        const tail = raw.slice(-Math.max(200, Math.floor(raw.length * 0.5))).trim();
+        if (tail) {
+          selected.unshift({
+            role: message.role,
+            content: tail
+          });
+        }
+      }
+      break;
+    }
+    selected.unshift(message);
+    usedTokens += messageTokens;
+  }
+
+  while (selected.length && selected[0].role === 'assistant') {
+    selected.shift();
+  }
+
+  return selected;
 }
 
 export async function runChatCommand(options) {
@@ -159,9 +248,42 @@ export async function runChatCommand(options) {
       state: memoryState,
       config: runtime.config
     });
+    const configuredContextBudget = runtime.config.conversation?.maxRecentContextTokens ?? 2800;
+    const hardContextCap = runtime.config.conversation?.hardContextCap ?? 3200;
+    const effectiveContextBudget = Math.max(
+      800,
+      Math.min(configuredContextBudget, hardContextCap)
+    );
+    const maxHistoryMessages = runtime.config.conversation?.maxHistoryMessages ?? 10;
+    const promptTokens = estimateTokens(prompt);
+    const systemPromptTokens = estimateTokens(systemPrompt);
+    const historyTokenBudget = Math.max(
+      240,
+      effectiveContextBudget - promptTokens - Math.ceil(systemPromptTokens * 0.35)
+    );
+    const recentMessages = trimHistoryByBudget(
+      normalizeHistoryOrder(getRecentMessagesForModel(memoryState)),
+      {
+        maxTokens: historyTokenBudget,
+        maxMessages: maxHistoryMessages
+      }
+    );
+    const requestMessages = [...recentMessages, { role: 'user', content: prompt }];
+
+    if (estimateMessagesTokens(requestMessages) > effectiveContextBudget) {
+      const fallbackHistory = trimHistoryByBudget(recentMessages, {
+        maxTokens: Math.floor(historyTokenBudget * 0.7),
+        maxMessages: Math.max(4, Math.floor(maxHistoryMessages * 0.7))
+      });
+      requestMessages.splice(0, requestMessages.length, ...fallbackHistory, {
+        role: 'user',
+        content: prompt
+      });
+    }
+
     const request = {
       systemPrompt,
-      messages: [...getRecentMessagesForModel(memoryState), { role: 'user', content: prompt }],
+      messages: requestMessages,
       temperature: options.temperature,
       maxOutputTokens:
         options.maxOutputTokens ??
@@ -170,6 +292,7 @@ export async function runChatCommand(options) {
     };
     let reply = '';
     let streamed = false;
+    let usedFallbackReply = false;
     const useChatTools =
       runtime.config.tools?.enabledInChat !== false && shouldUseToolLoop(message);
 
@@ -220,13 +343,15 @@ export async function runChatCommand(options) {
 
     if (!String(reply || '').trim()) {
       streamed = false;
-      reply = '我刚才没有收到模型的有效输出，请重试一次。';
+      reply = EMPTY_REPLY_FALLBACK;
+      usedFallbackReply = true;
     }
 
     if (
       !streamed &&
       runtime.config.conversation?.reflectionEnabled !== false &&
-      reply
+      reply &&
+      !usedFallbackReply
     ) {
       reply = await reflectAndRevise({
         criticClient,
@@ -239,6 +364,7 @@ export async function runChatCommand(options) {
     if (
       !streamed &&
       runtime.config.conversation?.autoContinueOnCutoff !== false &&
+      !usedFallbackReply &&
       reply.length > 1000 &&
       !/[。.!！?？]\s*$/.test(reply)
     ) {
@@ -264,7 +390,7 @@ export async function runChatCommand(options) {
       client,
       state: memoryState,
       userMessage: message,
-      assistantMessage: reply,
+      assistantMessage: usedFallbackReply ? '' : reply,
       config: runtime.config
     });
     await compactConversationIfNeeded({
