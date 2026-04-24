@@ -125,27 +125,49 @@ function mergeSessions(base, patch) {
   if (!patch) {
     return nextBase;
   }
-  const mergedMessages = [...(nextBase.recentMessages || []), ...(patch.recentMessages || [])];
-  const deduped = [];
-  const seen = new Set();
-  for (const message of mergedMessages) {
-    const key = `${message?.role}::${message?.timestamp}::${message?.content}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      deduped.push(message);
-    }
-  }
-  deduped.sort((left, right) =>
-    String(left?.timestamp || '').localeCompare(String(right?.timestamp || ''))
-  );
 
   return {
     ...nextBase,
     ...patch,
     summary: [nextBase.summary, patch.summary].filter(Boolean).join('\n\n').trim(),
     totalTurns: Math.max(nextBase.totalTurns || 0, patch.totalTurns || 0),
-    recentMessages: deduped
+    recentMessages: sanitizeSessionMessages([
+      ...(nextBase.recentMessages || []),
+      ...(patch.recentMessages || [])
+    ])
   };
+}
+
+function sanitizeSessionMessages(messages = []) {
+  const deduped = [];
+  const seen = new Set();
+
+  for (const message of messages || []) {
+    const role = String(message?.role || '').trim();
+    const content = String(message?.content || '').trim();
+    const timestamp = String(message?.timestamp || '').trim() || new Date().toISOString();
+    if (!content) {
+      continue;
+    }
+    if (role !== 'user' && role !== 'assistant') {
+      continue;
+    }
+    const key = `${role}::${timestamp}::${content}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push({
+      role,
+      content,
+      timestamp
+    });
+  }
+
+  deduped.sort((left, right) =>
+    String(left?.timestamp || '').localeCompare(String(right?.timestamp || ''))
+  );
+  return deduped;
 }
 
 export async function loadMemoryState(store, config) {
@@ -184,6 +206,12 @@ export async function loadMemoryState(store, config) {
     tasks = mergeTasks(tasks, sourceTask.tasks || []);
   }
 
+  session.recentMessages = sanitizeSessionMessages(session.recentMessages || []);
+  session.totalTurns = Math.max(
+    0,
+    session.totalTurns || Math.floor(session.recentMessages.length / 2)
+  );
+
   return {
     config,
     store,
@@ -199,6 +227,11 @@ export async function saveMemoryState(state) {
   state.session.updatedAt = new Date().toISOString();
   state.profile = sanitizeProfilePatch(state.profile);
   state.durableMemories = sanitizeDurableMemories(state.durableMemories);
+  state.session.recentMessages = sanitizeSessionMessages(state.session.recentMessages || []);
+  state.session.totalTurns = Math.max(
+    0,
+    state.session.totalTurns || Math.floor(state.session.recentMessages.length / 2)
+  );
   const roots = resolveSyncRoots(state.store, state.config);
   const writeRoots =
     state.config?.memory?.syncWritesToRoots === true ? roots : [state.store.storageRoot];
@@ -248,23 +281,31 @@ export function mergeMemoryExtraction(state, extraction, config) {
 }
 
 export function appendTurnToSession(state, userMessage, assistantMessage) {
-  state.session.totalTurns += 1;
-  state.session.recentMessages.push(
-    {
+  const now = new Date().toISOString();
+  const normalizedUser = String(userMessage || '').trim();
+  const normalizedAssistant = String(assistantMessage || '').trim();
+
+  if (normalizedUser) {
+    state.session.totalTurns += 1;
+    state.session.recentMessages.push({
       role: 'user',
-      content: userMessage,
-      timestamp: new Date().toISOString()
-    },
-    {
+      content: normalizedUser,
+      timestamp: now
+    });
+  }
+  if (normalizedAssistant) {
+    state.session.recentMessages.push({
       role: 'assistant',
-      content: assistantMessage,
-      timestamp: new Date().toISOString()
-    }
-  );
+      content: normalizedAssistant,
+      timestamp: now
+    });
+  }
+
+  state.session.recentMessages = sanitizeSessionMessages(state.session.recentMessages);
 }
 
 export function getRecentMessagesForModel(state) {
-  return (state.session.recentMessages || []).map(message => ({
+  return sanitizeSessionMessages(state.session.recentMessages || []).map(message => ({
     role: message.role,
     content: message.content
   }));

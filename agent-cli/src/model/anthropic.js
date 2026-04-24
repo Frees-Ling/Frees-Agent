@@ -1,5 +1,16 @@
 import { consumeSseStream, postJson, postStream } from '../utils/http.js';
 
+function resolveAnthropicMessagesEndpoint(baseUrl) {
+  const normalized = String(baseUrl || '').replace(/\/+$/, '');
+  if (normalized.endsWith('/v1/messages')) {
+    return normalized;
+  }
+  if (normalized.endsWith('/v1')) {
+    return `${normalized}/messages`;
+  }
+  return `${normalized}/v1/messages`;
+}
+
 export class AnthropicClient {
   constructor({ baseUrl, apiKey, model }) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
@@ -12,7 +23,7 @@ export class AnthropicClient {
       throw new Error('Anthropic provider 需要 API Key');
     }
 
-    const json = await postJson(`${this.baseUrl}/v1/messages`, {
+    const json = await postJson(resolveAnthropicMessagesEndpoint(this.baseUrl), {
       headers: {
         'x-api-key': this.apiKey,
         'anthropic-version': '2023-06-01'
@@ -43,7 +54,7 @@ export class AnthropicClient {
       throw new Error('Anthropic provider 需要 API Key');
     }
 
-    const stream = await postStream(`${this.baseUrl}/v1/messages`, {
+    const stream = await postStream(resolveAnthropicMessagesEndpoint(this.baseUrl), {
       headers: {
         'x-api-key': this.apiKey,
         'anthropic-version': '2023-06-01'

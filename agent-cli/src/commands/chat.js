@@ -21,6 +21,30 @@ import { printFreesAgentBanner } from '../ui/banner.js';
 import { runEditCommand } from './edit.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
 
+function shouldUseToolLoop(message) {
+  const text = String(message || '').trim().toLowerCase();
+  if (!text) {
+    return false;
+  }
+  const toolKeywords = [
+    '修改',
+    '重构',
+    '创建文件',
+    '读文件',
+    '查看文件',
+    'search',
+    'grep',
+    'read file',
+    'write file',
+    'replace',
+    'patch',
+    'apply',
+    '目录',
+    '代码改造'
+  ];
+  return toolKeywords.some(keyword => text.includes(keyword));
+}
+
 export async function runChatCommand(options) {
   const { client, runtime } = await createModelClient(options);
   printFreesAgentBanner(runtime, { command: 'chat' });
@@ -146,7 +170,8 @@ export async function runChatCommand(options) {
     };
     let reply = '';
     let streamed = false;
-    const useChatTools = runtime.config.tools?.enabledInChat !== false;
+    const useChatTools =
+      runtime.config.tools?.enabledInChat !== false && shouldUseToolLoop(message);
 
     if (useChatTools && index) {
       const toolbox = createAgentToolbox(index, {
@@ -176,9 +201,26 @@ export async function runChatCommand(options) {
           output.write(chunk);
         }
       });
-      output.write('\n');
+      if (String(reply || '').trim()) {
+        output.write('\n');
+      }
     } else {
       reply = await client.generateText(request);
+    }
+
+    if (streamed && !String(reply || '').trim()) {
+      // Some gateways may return an empty streamed body under specific constraints.
+      // Fallback once to non-stream mode to avoid writing empty assistant turns.
+      streamed = false;
+      reply = await client.generateText({
+        ...request,
+        temperature: request.temperature ?? 1
+      });
+    }
+
+    if (!String(reply || '').trim()) {
+      streamed = false;
+      reply = '我刚才没有收到模型的有效输出，请重试一次。';
     }
 
     if (

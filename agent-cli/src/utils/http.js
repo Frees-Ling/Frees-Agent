@@ -1,4 +1,8 @@
-async function request(url, { method = 'POST', headers = {}, body } = {}) {
+const DEFAULT_HTTP_TIMEOUT_MS = 45000;
+
+async function request(url, { method = 'POST', headers = {}, body, timeoutMs = DEFAULT_HTTP_TIMEOUT_MS } = {}) {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
     response = await fetch(url, {
@@ -7,11 +11,18 @@ async function request(url, { method = 'POST', headers = {}, body } = {}) {
         'content-type': 'application/json',
         ...headers
       },
-      body: body === undefined ? undefined : JSON.stringify(body)
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal
     });
   } catch (error) {
+    clearTimeout(timeoutHandle);
+    if (error && typeof error === 'object' && error.name === 'AbortError') {
+      throw new Error(`网络请求超时（${timeoutMs}ms），无法访问 ${url}。`);
+    }
     const details = error instanceof Error ? error.message : String(error);
     throw new Error(`网络连接失败，无法访问 ${url}。原始错误: ${details}`);
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 
   if (!response.ok) {
@@ -22,20 +33,22 @@ async function request(url, { method = 'POST', headers = {}, body } = {}) {
   return response;
 }
 
-export async function postJson(url, { headers = {}, body }) {
+export async function postJson(url, { headers = {}, body, timeoutMs } = {}) {
   const response = await request(url, {
     method: 'POST',
     headers,
-    body
+    body,
+    timeoutMs
   });
   return response.json();
 }
 
-export async function postStream(url, { headers = {}, body }) {
+export async function postStream(url, { headers = {}, body, timeoutMs } = {}) {
   const response = await request(url, {
     method: 'POST',
     headers,
-    body
+    body,
+    timeoutMs
   });
 
   if (!response.body) {

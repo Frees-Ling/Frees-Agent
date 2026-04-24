@@ -11,16 +11,19 @@ const DEFAULT_CONFIG = {
     },
     'openai-compatible': {
       baseUrl: 'http://192.168.2.5:1202/v1',// http://127.0.0.1:1234/v1
+      apiKey: '',
       apiKeyEnv: 'OPENAI_API_KEY',
       model: 'openai/gpt-oss-120b'
     },
     anthropic: {
       baseUrl: 'https://api.moonshot.cn/v1',
+      apiKey: 'sk-TR3voqvwMLF9rT38AeIxUuHfPoPMeP7qWbxnqNySuj7kQm1j',
       apiKeyEnv: 'sk-TR3voqvwMLF9rT38AeIxUuHfPoPMeP7qWbxnqNySuj7kQm1j',
       model: 'kimi-k2.6'
     },//sk-29aeab513e764eb08a964adf8ac6c93e
     mcp: {
       baseUrl: 'http://127.0.0.1:1234/v1',
+      apiKey: '',
       apiKeyEnv: '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',
       model: 'qwen/qwen3.5-9b',
       server: 'tavily'

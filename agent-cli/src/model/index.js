@@ -4,10 +4,25 @@ import { OllamaClient } from './ollama.js';
 import { OpenAICompatibleClient } from './openai-compatible.js';
 
 const PROVIDER_PRIORITY = ['ollama', 'openai-compatible', 'mcp', 'anthropic'];
+const PROVIDER_PROBE_TIMEOUT_MS = 12000;
 
 function getApiKey({ apiKey, apiKeyEnv, configKeyEnv }) {
   if (apiKey) {
     return apiKey;
+  }
+  // Backward-compatible behavior:
+  // if config mistakenly puts a real key in apiKeyEnv, use it directly.
+  if (typeof apiKeyEnv === 'string') {
+    const trimmed = apiKeyEnv.trim();
+    if (
+      trimmed &&
+      (trimmed.startsWith('sk-') ||
+        trimmed.startsWith('tvly-') ||
+        trimmed.startsWith('Bearer ') ||
+        trimmed.length > 40)
+    ) {
+      return trimmed;
+    }
   }
   const envName = apiKeyEnv || configKeyEnv;
   if (!envName) {
@@ -37,7 +52,7 @@ export async function resolveModelRuntime(options = {}) {
 
   const apiKey = getApiKey({
     apiKey: options.apiKey,
-    apiKeyEnv: options.apiKeyEnv,
+    apiKeyEnv: options.apiKeyEnv || providerConfig.apiKey,
     configKeyEnv: providerConfig.apiKeyEnv
   });
 
@@ -45,10 +60,36 @@ export async function resolveModelRuntime(options = {}) {
     config,
     configPath: path,
     providerName,
+    providerProtocol: providerConfig.protocol || '',
     model,
     baseUrl,
     apiKey
   };
+}
+
+function isLikelyAnthropicEndpoint(baseUrl) {
+  const normalized = String(baseUrl || '').toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+  if (normalized.includes('anthropic.com')) {
+    return true;
+  }
+  if (normalized.endsWith('/v1/messages')) {
+    return true;
+  }
+  return false;
+}
+
+function resolveAnthropicTransport(runtime) {
+  const explicit = String(runtime.providerProtocol || '').trim().toLowerCase();
+  if (explicit === 'openai-compatible' || explicit === 'openai') {
+    return 'openai-compatible';
+  }
+  if (explicit === 'anthropic') {
+    return 'anthropic';
+  }
+  return isLikelyAnthropicEndpoint(runtime.baseUrl) ? 'anthropic' : 'openai-compatible';
 }
 
 function instantiateClient(runtime) {
@@ -59,6 +100,14 @@ function instantiateClient(runtime) {
     });
   }
   if (runtime.providerName === 'anthropic') {
+    const transport = resolveAnthropicTransport(runtime);
+    if (transport === 'openai-compatible') {
+      return new OpenAICompatibleClient({
+        baseUrl: runtime.baseUrl,
+        apiKey: runtime.apiKey,
+        model: runtime.model
+      });
+    }
     return new AnthropicClient({
       baseUrl: runtime.baseUrl,
       apiKey: runtime.apiKey,
@@ -85,6 +134,21 @@ async function pingClient(client) {
   return String(response || '').trim();
 }
 
+async function pingClientWithTimeout(client, timeoutMs = PROVIDER_PROBE_TIMEOUT_MS) {
+  let timeoutHandle;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`连接探测超时（${timeoutMs}ms）`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([pingClient(client), timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
 function resolveFallbackProviders(config, preferred) {
   const configured = Object.keys(config.providers || {});
   const sorted = PROVIDER_PRIORITY.filter(name => configured.includes(name));
@@ -98,8 +162,10 @@ function resolveFallbackProviders(config, preferred) {
 
 export async function createModelClient(options = {}) {
   const runtime = await resolveModelRuntime(options);
+  const providerExplicit = options.provider !== undefined && options.provider !== null;
   const autoFallback =
     options.autoProvider ??
+    (providerExplicit ? false : undefined) ??
     runtime.config.conversation?.autoProviderFallback ??
     false;
 
@@ -111,30 +177,48 @@ export async function createModelClient(options = {}) {
   }
 
   const providerQueue = resolveFallbackProviders(runtime.config, runtime.providerName);
-  const errors = [];
-
-  for (const providerName of providerQueue) {
-    const providerRuntime = await resolveModelRuntime({
-      ...options,
-      provider: providerName
-    });
-    const client = instantiateClient(providerRuntime);
-    try {
-      await pingClient(client);
+  const probeTasks = await Promise.all(
+    providerQueue.map(async providerName => {
+      const providerRuntime = await resolveModelRuntime({
+        ...options,
+        provider: providerName
+      });
+      const client = instantiateClient(providerRuntime);
       return {
-        client,
-        runtime: providerRuntime
+        providerName,
+        providerRuntime,
+        client
       };
-    } catch (error) {
-      errors.push(
-        `${providerName}: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
-  throw new Error(
-    `所有 provider 自动回退均不可用。\n${errors.map(item => `- ${item}`).join('\n')}`
+    })
   );
+
+  const errors = [];
+  const attempts = probeTasks.map(task =>
+    pingClientWithTimeout(task.client)
+      .then(() => ({
+        ok: true,
+        providerName: task.providerName,
+        providerRuntime: task.providerRuntime,
+        client: task.client
+      }))
+      .catch(error => {
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`${task.providerName}: ${message}`);
+        throw error;
+      })
+  );
+
+  try {
+    const winner = await Promise.any(attempts);
+    return {
+      client: winner.client,
+      runtime: winner.providerRuntime
+    };
+  } catch {
+    throw new Error(
+      `所有 provider 自动回退均不可用。\n${errors.map(item => `- ${item}`).join('\n')}`
+    );
+  }
 }
 
 export async function createRoleModelClient(options = {}, role = 'planner') {

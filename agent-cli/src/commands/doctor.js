@@ -44,9 +44,9 @@ export async function runDoctorCommand(options) {
     const reply = await client.generateText({
       systemPrompt: 'You are a health check assistant.',
       messages: [{ role: 'user', content: 'Reply with exactly: PONG' }],
-      temperature: 0,
+      temperature: 1,
       maxOutputTokens: 32
     });
-    console.log(`\nPing response: ${reply}`);
+    console.log(`\nPing response: ${reply || '[empty]'}`);
   }
 }
