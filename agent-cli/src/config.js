@@ -15,12 +15,12 @@ const DEFAULT_CONFIG = {
       apiKeyEnv: 'OPENAI_API_KEY',
       model: 'qwen/qwen3.6-27b'
     },
-    anthropic: {
-      baseUrl: 'https://api.moonshot.cn/v1',
-      apiKey: 'sk-TR3voqvwMLF9rT38AeIxUuHfPoPMeP7qWbxnqNySuj7kQm1j',
-      apiKeyEnv: 'sk-TR3voqvwMLF9rT38AeIxUuHfPoPMeP7qWbxnqNySuj7kQm1j',
-      model: 'kimi-k2.6'
-    },//sk-29aeab513e764eb08a964adf8ac6c93e
+    // anthropic: {
+    //   baseUrl: 'https://api.moonshot.cn/v1',
+    //   apiKey: 'sk-TR3voqvwMLF9rT38AeIxUuHfPoPMeP7qWbxnqNySuj7kQm1j',
+    //   apiKeyEnv: 'sk-TR3voqvwMLF9rT38AeIxUuHfPoPMeP7qWbxnqNySuj7kQm1j',
+    //   model: 'kimi-k2.6'
+    // },//sk-29aeab513e764eb08a964adf8ac6c93e
     mcp: {
       baseUrl: 'http://127.0.0.1:1234/v1',
       apiKey: '',
