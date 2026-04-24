@@ -17,7 +17,7 @@ const DEFAULT_CONFIG = {
     anthropic: {
       baseUrl: 'https://api.moonshot.cn/v1',
       apiKeyEnv: 'sk-TR3voqvwMLF9rT38AeIxUuHfPoPMeP7qWbxnqNySuj7kQm1j',
-      model: 'qwen-plus'
+      model: 'kimi-k2.6'
     },//sk-29aeab513e764eb08a964adf8ac6c93e
     mcp: {
       baseUrl: 'http://127.0.0.1:1234/v1',
