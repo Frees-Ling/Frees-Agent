@@ -12,13 +12,13 @@ const DEFAULT_CONFIG = {
     'openai-compatible': {
       baseUrl: 'http://192.168.2.5:1202/v1',// http://127.0.0.1:1234/v1
       apiKeyEnv: 'OPENAI_API_KEY',
-      model: 'zai-org/glm-4.7-flash'
+      model: 'openai/gpt-oss-120b'
     },
     anthropic: {
-      baseUrl: 'https://api.anthropic.com',
-      apiKeyEnv: 'ANTHROPIC_API_KEY',
-      model: 'claude-sonnet-4-5'
-    },
+      baseUrl: 'https://api.moonshot.cn/v1',
+      apiKeyEnv: 'sk-TR3voqvwMLF9rT38AeIxUuHfPoPMeP7qWbxnqNySuj7kQm1j',
+      model: 'qwen-plus'
+    },//sk-29aeab513e764eb08a964adf8ac6c93e
     mcp: {
       baseUrl: 'http://127.0.0.1:1234/v1',
       apiKeyEnv: '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',

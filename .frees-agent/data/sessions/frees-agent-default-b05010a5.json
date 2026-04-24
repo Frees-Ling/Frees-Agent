@@ -1,0 +1,21 @@
+{
+  "id": "frees-agent-default-b05010a5",
+  "name": "default",
+  "workspaceRoot": "E:\\Frees_Ling\\Code\\Frees-Agent",
+  "createdAt": "2026-04-24T07:27:57.385Z",
+  "updatedAt": "2026-04-24T07:28:18.410Z",
+  "totalTurns": 1,
+  "summary": "",
+  "recentMessages": [
+    {
+      "role": "user",
+      "content": "你好",
+      "timestamp": "2026-04-24T07:28:07.907Z"
+    },
+    {
+      "role": "assistant",
+      "content": "你好，Frees Ling。我是 Frees Agent。有什么我可以直接帮你处理的？",
+      "timestamp": "2026-04-24T07:28:07.907Z"
+    }
+  ]
+}
