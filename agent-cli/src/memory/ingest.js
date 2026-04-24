@@ -7,6 +7,10 @@ const PROFILE_ARRAY_FIELDS = [
   'interests'
 ];
 
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function normalizeText(value) {
   return String(value || '')
     .trim()
@@ -86,11 +90,20 @@ function mergeProfilePatch(base = {}, patch = {}) {
     if (value === undefined || value === null || value === '') {
       continue;
     }
-    if (Array.isArray(value) || PROFILE_ARRAY_FIELDS.includes(key)) {
+    if (Array.isArray(value) || (PROFILE_ARRAY_FIELDS.includes(key) && !isPlainObject(value))) {
       const useTechNormalization = key === 'skills' || key === 'stack';
-      next[key] = mergeArrayField(next[key], Array.isArray(value) ? value : [value], {
+      const baseArray = Array.isArray(next[key]) ? next[key] : [];
+      next[key] = mergeArrayField(baseArray, Array.isArray(value) ? value : [value], {
         useTechNormalization
       });
+      continue;
+    }
+    if (isPlainObject(value)) {
+      next[key] = mergeProfilePatch(isPlainObject(next[key]) ? next[key] : {}, value);
+      continue;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      next[key] = value;
       continue;
     }
     next[key] = normalizeText(value);

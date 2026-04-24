@@ -12,19 +12,16 @@ function normalizeMessageContent(content) {
   return String(content ?? '');
 }
 
+function sanitizeVisibleText(text) {
+  return String(text || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .trim();
+}
+
 function extractAssistantText(json) {
   const message = json?.choices?.[0]?.message || {};
   const primary = normalizeMessageContent(message?.content);
-  if (primary) {
-    return primary;
-  }
-  const reasoning = normalizeMessageContent(
-    message?.reasoning_content ?? json?.choices?.[0]?.reasoning_content ?? ''
-  );
-  if (reasoning) {
-    return reasoning;
-  }
-  return '';
+  return sanitizeVisibleText(primary);
 }
 
 export class OpenAICompatibleClient {
@@ -168,6 +165,45 @@ export class OpenAICompatibleClient {
     }
 
     let fullText = '';
+    let inThinkBlock = false;
+
+    function filterThinkChunk(inputChunk) {
+      let chunk = String(inputChunk || '');
+      if (!chunk) {
+        return '';
+      }
+
+      if (inThinkBlock) {
+        const end = chunk.toLowerCase().indexOf('</think>');
+        if (end === -1) {
+          return '';
+        }
+        inThinkBlock = false;
+        chunk = chunk.slice(end + '</think>'.length);
+      }
+
+      let output = '';
+      while (chunk.length) {
+        const lower = chunk.toLowerCase();
+        const start = lower.indexOf('<think>');
+        if (start === -1) {
+          output += chunk;
+          break;
+        }
+        output += chunk.slice(0, start);
+        const rest = chunk.slice(start + '<think>'.length);
+        const restLower = rest.toLowerCase();
+        const end = restLower.indexOf('</think>');
+        if (end === -1) {
+          inThinkBlock = true;
+          chunk = '';
+          break;
+        }
+        chunk = rest.slice(end + '</think>'.length);
+      }
+      return output;
+    }
+
     await consumeSseStream(stream, async event => {
       const data = String(event?.data || '').trim();
       if (!data || data === '[DONE]') {
@@ -183,9 +219,7 @@ export class OpenAICompatibleClient {
 
       const delta = normalizeMessageContent(
         json?.choices?.[0]?.delta?.content ??
-          json?.choices?.[0]?.delta?.reasoning_content ??
           json?.choices?.[0]?.message?.content ??
-          json?.choices?.[0]?.message?.reasoning_content ??
           ''
       );
 
@@ -193,12 +227,17 @@ export class OpenAICompatibleClient {
         return;
       }
 
-      fullText += delta;
+      const visibleDelta = filterThinkChunk(delta);
+      if (!visibleDelta) {
+        return;
+      }
+
+      fullText += visibleDelta;
       if (onToken) {
-        await onToken(delta);
+        await onToken(visibleDelta);
       }
     });
 
-    return fullText;
+    return sanitizeVisibleText(fullText);
   }
 }

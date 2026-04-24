@@ -1,11 +1,159 @@
 {
   "name": "Frees Ling",
-  "goals": [],
-  "preferences": [],
-  "skills": [],
+  "goals": [
+    "成为全栈开发工程师",
+    "深入学习AI与算法",
+    "参加蓝桥杯（Python组）",
+    "本科后考研进入更好的学校",
+    "构建自己的AI Agent系统"
+  ],
+  "preferences": [
+    "分步骤讲解",
+    "先直觉再深入",
+    "要有实际代码",
+    "边学边做项目",
+    "清晰结构",
+    "适度幽默",
+    "不要空话",
+    "要有工程思维"
+  ],
+  "skills": [
+    "Python",
+    "C/C++",
+    "Git",
+    "数据库开发"
+  ],
   "stack": [
-    "Rust"
+    "Rust",
+    "Python",
+    "C/C++",
+    "Git",
+    "数据库开发",
+    "PX4",
+    "MAVSDK",
+    "LoRA",
+    "微调"
   ],
   "constraints": [],
-  "interests": []
+  "interests": [
+    "人工智能",
+    "算法",
+    "数据库",
+    "系统设计",
+    "Furry文化",
+    "英雄联盟（劫）",
+    "索尼克",
+    "动漫（魔偶马戏团）"
+  ],
+  "nickname": "Frees Ling",
+  "persona": "Furry角色（狐狸“泠”），有完整设定（红白蓝配色，头部花纹保留，尾巴创意设计）",
+  "personality": {
+    "mental_age": 17,
+    "traits": [
+      "理性",
+      "技术导向",
+      "好奇心强",
+      "既社恐也社牛",
+      "喜欢新鲜事物"
+    ],
+    "interaction_style": [
+      "喜欢条理清晰",
+      "喜欢幽默一点",
+      "接受深入讲解"
+    ]
+  },
+  "education": {
+    "background": "浙江理科生",
+    "subjects": [
+      "物理",
+      "化学",
+      "地理"
+    ],
+    "focus": [
+      "高等数学",
+      "编程基础",
+      "算法"
+    ]
+  },
+  "hardware": {
+    "devices": [
+      "iPhone 16 Pro Max",
+      "Windows 11 PC",
+      "MacBook"
+    ],
+    "planned_purchase": "8000元预算轻薄本（编程+AI+LOL）"
+  },
+  "projects": {
+    "current": [
+      "本地AI Agent（带长期记忆系统）",
+      "HuggingFace模型批量下载器",
+      "无人机软件系统（PX4 + MAVSDK）"
+    ],
+    "research_direction": [
+      "模型二次训练（LoRA / 微调）",
+      "上下文压缩",
+      "Agent长期记忆架构"
+    ]
+  },
+  "social": {
+    "friends": [
+      "连修璟（高中）",
+      "朱泽畅（初中）"
+    ],
+    "notes": "重视精神共鸣，擅长开导别人，但对自身状态有困惑"
+  },
+  "skillsDetail": {
+    "programming": [
+      "Python",
+      "C/C++",
+      "Git",
+      "数据库开发"
+    ],
+    "projects": [
+      "QQ Bot开发",
+      "无人机管道巡检系统",
+      "AI Agent（本地推理 + 记忆系统）"
+    ],
+    "tools": [
+      "VSCode",
+      "Linux",
+      "Windows",
+      "iOS生态"
+    ]
+  },
+  "preferencesDetail": {
+    "learning_style": [
+      "分步骤讲解",
+      "先直觉再深入",
+      "要有实际代码",
+      "边学边做项目"
+    ],
+    "response_style": [
+      "清晰结构",
+      "适度幽默",
+      "不要空话",
+      "要有工程思维"
+    ]
+  },
+  "profileDetail": {
+    "name": "Frees Ling",
+    "nickname": "Frees Ling",
+    "persona": "Furry角色（狐狸“泠”），有完整设定（红白蓝配色，头部花纹保留，尾巴创意设计）",
+    "personality": {
+      "mental_age": 17,
+      "traits": [
+        "理性",
+        "技术导向",
+        "好奇心强",
+        "既社恐也社牛",
+        "喜欢新鲜事物"
+      ],
+      "interaction_style": [
+        "喜欢条理清晰",
+        "喜欢幽默一点",
+        "接受深入讲解"
+      ]
+    }
+  },
+  "memoryVersion": "v2-rich-profile"
 }
