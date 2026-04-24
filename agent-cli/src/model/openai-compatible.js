@@ -25,8 +25,23 @@ function isQwen3ReasoningModel(model) {
 
 function extractAssistantText(json) {
   const message = json?.choices?.[0]?.message || {};
-  const primary = normalizeMessageContent(message?.content);
-  return sanitizeVisibleText(primary);
+
+  const content = normalizeMessageContent(message?.content);
+  const reasoning = normalizeMessageContent(message?.reasoning_content);
+
+  if (content && content.trim()) {
+    return sanitizeVisibleText(content);
+  }
+
+  if (reasoning && reasoning.trim()) {
+    return sanitizeVisibleText(
+      reasoning
+        .replace(/^here'?s a thinking process[:：]?/i, '')
+        .trim()
+    );
+  }
+
+  return '';
 }
 
 export class OpenAICompatibleClient {
