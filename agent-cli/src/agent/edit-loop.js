@@ -27,13 +27,25 @@ export async function runEditAgent({
   dryRun = false,
   temperature = 0.2,
   maxOutputTokens = 16000,
-  verbose = false
+  verbose = false,
+  mcpManager = null
 }) {
   if (!index) {
     throw new Error('编辑代理未收到工作区索引。');
   }
 
   const actualToolbox = createAgentToolbox(index, { dryRun });
+
+  // Attach MCP tools if available
+  if (mcpManager && actualToolbox.setMcpManager) {
+    actualToolbox.setMcpManager(mcpManager);
+    await actualToolbox.mcpHandlers.refreshTools();
+    const mcpTools = actualToolbox.mcpHandlers.getToolNames();
+    if (mcpTools.length && verbose) {
+      console.log(`[edit] loaded ${mcpTools.length} MCP tools`);
+    }
+  }
+
   const messages = [
     {
       role: 'user',

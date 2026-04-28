@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -l src-cli-claude-code.zip)",
+      "Bash(mkdir -p D:/Frees-Agent/src-cli-reference)",
+      "Bash(unzip -o ../src-cli-claude-code.zip)",
+      "Bash(node --test)"
+    ]
+  }
+}

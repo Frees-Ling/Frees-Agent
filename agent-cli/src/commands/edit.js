@@ -3,6 +3,7 @@ import { createModelClient } from '../model/index.js';
 import { printFreesAgentBanner } from '../ui/banner.js';
 import { runEditAgent } from '../agent/edit-loop.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
+import { McpManager } from '../tools/mcp-client.js';
 
 export async function runEditCommand(options) {
   if (!options.workspace) {
@@ -15,6 +16,14 @@ export async function runEditCommand(options) {
   const workspaceRoot = path.resolve(options.workspace);
   const { client, runtime } = await createModelClient(options);
   printFreesAgentBanner(runtime, { command: 'edit' });
+  const mcpManager = new McpManager({
+    config: runtime.config,
+    storageRoot: path.dirname(runtime.configPath)
+  });
+  const mcpServerNames = Object.keys(runtime.config.mcpServers || {});
+  if (mcpServerNames.length) {
+    console.log(`[edit] mcp servers: ${mcpServerNames.join(', ')}`);
+  }
   const index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
   const workspaceOverview = buildWorkspaceOverview(index);
   const relevantFiles = findRelevantFiles(index, options.task);
@@ -38,7 +47,8 @@ export async function runEditCommand(options) {
       options.maxOutputTokens ??
       runtime.config.conversation?.maxOutputTokens ??
       16000,
-    verbose: options.verbose
+    verbose: options.verbose,
+    mcpManager: mcpServerNames.length ? mcpManager : null
   });
 
   console.log('\nSummary:');

@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { runEditAgent } from '../src/agent/edit-loop.js';
+import { partitionTools, executeToolBatch, executeToolsSequential } from '../src/agent/orchestration.js';
+import { McpManager } from '../src/tools/mcp-client.js';
 import {
   buildChatSystemPrompt,
   compactConversationIfNeeded,
@@ -530,4 +532,93 @@ test('ollama streamText emits incremental tokens', async () => {
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+test('tool orchestration partitions read-only vs write tools', () => {
+  const { concurrent, sequential } = partitionTools([
+    { name: 'list_files', args: {} },
+    { name: 'write_file', args: { path: 'test.txt', content: 'hello' } },
+    { name: 'read_file', args: { path: 'test.txt' } },
+    { name: 'delete_file', args: { path: 'test.txt' } }
+  ]);
+
+  assert.equal(concurrent.length, 2);
+  assert.equal(sequential.length, 2);
+  assert.equal(concurrent[0].name, 'list_files');
+  assert.equal(concurrent[1].name, 'read_file');
+  assert.equal(sequential[0].name, 'write_file');
+  assert.equal(sequential[1].name, 'delete_file');
+});
+
+test('tool orchestration executes concurrent batch', async () => {
+  const executed = [];
+  const runToolFn = async (name) => {
+    executed.push(name);
+    return { success: true };
+  };
+
+  await executeToolBatch([
+    { name: 'read_file', args: { path: 'a.txt' } },
+    { name: 'read_file', args: { path: 'b.txt' } }
+  ], runToolFn);
+
+  assert.equal(executed.length, 2);
+  assert.ok(executed.includes('read_file'));
+});
+
+test('partitionTools treats mcp tools as concurrent', () => {
+  const { concurrent, sequential } = partitionTools([
+    { name: 'mcp__server__search', args: { query: 'test' } },
+    { name: 'write_file', args: { path: 'test.txt', content: '' } }
+  ]);
+
+  assert.equal(concurrent.length, 1);
+  assert.equal(concurrent[0].name, 'mcp__server__search');
+  assert.equal(sequential.length, 1);
+  assert.equal(sequential[0].name, 'write_file');
+});
+
+test('executeToolsSequential runs tools one by one', async () => {
+  const order = [];
+  const runToolFn = async (name) => {
+    order.push(name);
+    return { ok: true };
+  };
+
+  await executeToolsSequential([
+    { name: 'first', args: {} },
+    { name: 'second', args: {} }
+  ], runToolFn);
+
+  assert.equal(order.length, 2);
+  assert.equal(order[0], 'first');
+  assert.equal(order[1], 'second');
+});
+
+test('McpManager handles empty config', async () => {
+  const manager = new McpManager({ config: {}, storageRoot: '/tmp' });
+  const tools = await manager.listAllTools();
+  assert.equal(tools.length, 0);
+});
+
+test('McpManager throws for unknown server', async () => {
+  const manager = new McpManager({ config: {}, storageRoot: '/tmp' });
+  await assert.rejects(
+    () => manager.getOrConnect('nonexistent'),
+    /MCP 服务器未配置/
+  );
+});
+
+test('expandEnvVars replaces patterns', async () => {
+  const { expandEnvVars } = await import('../src/config.js');
+  process.env.TEST_VAR = 'test-value';
+  const result = expandEnvVars('hello ${TEST_VAR} world');
+  assert.equal(result, 'hello test-value world');
+  delete process.env.TEST_VAR;
+});
+
+test('McpManager disconnectAll handles empty state', async () => {
+  const manager = new McpManager({ config: {}, storageRoot: '/tmp' });
+  await manager.disconnectAll();
+  assert.ok(true);
 });

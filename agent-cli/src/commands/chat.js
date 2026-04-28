@@ -21,6 +21,7 @@ import { printFreesAgentBanner } from '../ui/banner.js';
 import { estimateMessagesTokens, estimateTokens } from '../utils/tokens.js';
 import { runEditCommand } from './edit.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
+import { McpManager } from '../tools/mcp-client.js';
 
 const EMPTY_REPLY_FALLBACK = '我刚才没有收到模型的有效输出，请重试一次。';
 
@@ -152,6 +153,15 @@ export async function runChatCommand(options) {
   );
   if (availableSkills.length) {
     console.log(`[chat] loaded skills: ${availableSkills.length}`);
+  }
+
+  const mcpManager = new McpManager({
+    config: runtime.config,
+    storageRoot: path.dirname(runtime.configPath)
+  });
+  const mcpServerNames = Object.keys(runtime.config.mcpServers || {});
+  if (mcpServerNames.length) {
+    console.log(`[mcp] configured servers: ${mcpServerNames.join(', ')}`);
   }
 
   const memoryStore = await createMemoryStore({
@@ -301,6 +311,11 @@ export async function runChatCommand(options) {
         readOnly: true,
         config: runtime.config
       });
+      // Connect MCP tools if any MCP servers are configured
+      if (mcpServerNames.length && toolbox.setMcpManager) {
+        toolbox.setMcpManager(mcpManager);
+        await toolbox.mcpHandlers.refreshTools();
+      }
       reply = await runChatToolAgent({
         client,
         toolbox,

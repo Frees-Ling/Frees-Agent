@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const DEFAULT_CONFIG = {
   defaultProvider: 'openai-compatible',
@@ -210,4 +215,93 @@ export async function writeDefaultConfig(explicitPath, { force = false } = {}) {
 
   await writeFile(configPath, `${JSON.stringify(getDefaultConfig(), null, 2)}\n`, 'utf8');
   return configPath;
+}
+
+export function getDefaultConfigPathForProfile(profileName = 'default') {
+  const homeOverride = process.env.FREES_AGENT_HOME;
+  if (homeOverride) {
+    return path.join(path.resolve(homeOverride), `${profileName}.json`);
+  }
+  const configDir = path.resolve(process.cwd(), '.frees-agent');
+  if (profileName === 'default') {
+    return path.join(configDir, 'config.json');
+  }
+  return path.join(configDir, `config-${profileName}.json`);
+}
+
+export function expandEnvVars(value) {
+  if (typeof value === 'string') {
+    return value.replace(/\$\{(\w+)\}/g, (_, name) => process.env[name] || '');
+  }
+  if (Array.isArray(value)) {
+    return value.map(expandEnvVars);
+  }
+  if (value && typeof value === 'object') {
+    const result = {};
+    for (const [key, val] of Object.entries(value)) {
+      result[key] = expandEnvVars(val);
+    }
+    return result;
+  }
+  return value;
+}
+
+const CONFIG_SCHEMA = {
+  defaultProvider: { type: 'string', required: false },
+  defaultModel: { type: 'string', required: false },
+  providers: { type: 'object', required: false },
+  mcpServers: {
+    type: 'object',
+    required: false,
+    validate: (value) => {
+      if (!value || typeof value !== 'object') return [];
+      const errors = [];
+      for (const [name, config] of Object.entries(value)) {
+        if (!config.command && !config.url) {
+          errors.push(`mcpServers.${name}: 需要 command 或 url`);
+        }
+        if (config.timeoutMs !== undefined && (typeof config.timeoutMs !== 'number' || config.timeoutMs < 1000)) {
+          errors.push(`mcpServers.${name}.timeoutMs: 必须 >= 1000`);
+        }
+      }
+      return errors;
+    }
+  }
+};
+
+export function validateConfig(config) {
+  const errors = [];
+  for (const [key, schema] of Object.entries(CONFIG_SCHEMA)) {
+    const value = config[key];
+    if (value === undefined || value === null) {
+      if (schema.required) {
+        errors.push(`缺少必要配置: ${key}`);
+      }
+      continue;
+    }
+    if (schema.type === 'string' && typeof value !== 'string') {
+      errors.push(`${key}: 应为字符串`);
+    }
+    if (schema.type === 'object' && (typeof value !== 'object' || Array.isArray(value))) {
+      errors.push(`${key}: 应为对象`);
+    }
+    if (schema.validate) {
+      const schemaErrors = schema.validate(value);
+      errors.push(...schemaErrors);
+    }
+  }
+  return errors;
+}
+
+export function getFreesAgentVersion() {
+  const pkgPath = path.resolve(__dirname, '..', 'package.json');
+  try {
+    return JSON.parse(readFileSync(pkgPath, 'utf8')).version || '0.1.0';
+  } catch {
+    return '0.1.0';
+  }
+}
+
+export function getFreesAgentHome() {
+  return process.env.FREES_AGENT_HOME || path.resolve(process.cwd(), '.frees-agent');
 }
