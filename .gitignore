@@ -7,11 +7,11 @@
 # Dependencies
 node_modules/
 
-# Claude AI
-.claude/
+# # Claude AI
+# .claude/
 
-# Frees-Agent local data
-.frees-agent/
+# # Frees-Agent local data
+# .frees-agent/
 
 # Rust / Tauri build artifacts (large binaries)
 agent-cli/src-tauri/target/

@@ -12,7 +12,29 @@
       "Bash(node src/cli.js help)",
       "Bash(node *)",
       "Bash(', *)",
-      "Bash(' *)"
+      "Bash(' *)",
+      "Bash(npm link *)",
+      "Bash(npm root *)",
+      "Read(//c/Users/lenovo/**)",
+      "Bash(frees-agent --help)",
+      "Bash(npm test *)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Bash(pnpm *)",
+      "Bash(npx *)",
+      "Bash(yarn *)",
+      "Bash(node *)",
+      "Bash(npm install *)",
+      "Bash(rustc --version)",
+      "Bash(cargo --version)",
+      "Bash(cargo install *)",
+      "Bash(cargo build *)",
+      "Bash(rustup target *)",
+      "Bash(grep -E \"\\\\.\\(dll|exe|a\\)$\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
