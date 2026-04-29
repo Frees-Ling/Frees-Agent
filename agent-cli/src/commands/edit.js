@@ -7,7 +7,7 @@ import { McpManager } from '../tools/mcp-client.js';
 
 export async function runEditCommand(options) {
   if (!options.workspace) {
-    throw new Error('edit 命令需要工作区路径，例如: ai-agent edit . --task "修复登录逻辑"');
+    throw new Error('edit 命令需要工作区路径，例如: frees-agent edit . --task "修复登录逻辑"');
   }
   if (!options.task) {
     throw new Error('edit 命令必须提供 --task');

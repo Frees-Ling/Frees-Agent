@@ -13,7 +13,7 @@
     "edit": "node ./bin/ai-agent.js edit",
     "complete": "node ./bin/ai-agent.js complete",
     "doctor": "node ./bin/ai-agent.js doctor",
-    "test": "node --test",
+    "test": "node --test test/",
     "build:bundle": "mkdir dist && npx esbuild ./src/cli.js --bundle --platform=node --target=node20 --outfile=dist/frees-agent.js && npx cpy \"docs/**/*\" dist/docs",    
     "build:exe": "npx pkg . --targets node18-win-x64 --output release/frees-agent.exe",
     "build": "npm run build:bundle && npm run build:exe"

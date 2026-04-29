@@ -1,4 +1,5 @@
 import { extractFirstJsonObject, truncateForModel } from '../utils/json.js';
+import { hasUltraplanKeyword } from '../utils/ultraplan/keyword.js';
 
 export async function buildExecutionPlan({
   plannerClient,
@@ -6,14 +7,20 @@ export async function buildExecutionPlan({
   workspaceOverview,
   enabled = true
 }) {
-  if (!enabled || !plannerClient) {
+  const ultraplan = hasUltraplanKeyword(message);
+  const effectiveEnabled = enabled || ultraplan;
+
+  if (!effectiveEnabled || !plannerClient) {
     return '';
   }
 
+  const planPrompt = ultraplan
+    ? '你是增强规划器。用户要求详细规划。返回 JSON：{"steps":["..."],"complexity":"low|medium|high","dependencies":["..."],"risks":["..."],"estimatedEffort":"..."}'
+    : '你是任务规划器。只返回 JSON：{"steps":["..."],"complexity":"low|medium|high"}';
+
   try {
     const raw = await plannerClient.generateText({
-      systemPrompt:
-        '你是任务规划器。只返回 JSON：{"steps":["..."],"complexity":"low|medium|high"}',
+      systemPrompt: planPrompt,
       messages: [
         {
           role: 'user',
@@ -23,8 +30,8 @@ export async function buildExecutionPlan({
           )}`
         }
       ],
-      temperature: 0.1,
-      maxOutputTokens: 500
+      temperature: ultraplan ? 0.2 : 0.1,
+      maxOutputTokens: ultraplan ? 1200 : 500
     });
     const payload = extractFirstJsonObject(raw);
     if (!payload || !Array.isArray(payload.steps) || !payload.steps.length) {

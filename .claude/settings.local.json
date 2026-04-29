@@ -4,7 +4,15 @@
       "Bash(unzip -l src-cli-claude-code.zip)",
       "Bash(mkdir -p D:/Frees-Agent/src-cli-reference)",
       "Bash(unzip -o ../src-cli-claude-code.zip)",
-      "Bash(node --test)"
+      "Bash(node --test)",
+      "Bash(grep -E \"^chalk$\")",
+      "Bash(grep -E \"^figures$\")",
+      "Bash(node -e ' *)",
+      "Bash(xxd)",
+      "Bash(node src/cli.js help)",
+      "Bash(node *)",
+      "Bash(', *)",
+      "Bash(' *)"
     ]
   }
 }

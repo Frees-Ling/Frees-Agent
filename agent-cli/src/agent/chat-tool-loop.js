@@ -1,6 +1,11 @@
 import { extractFirstJsonObject } from '../utils/json.js';
+import { truncateToWidth } from '../utils/truncate.js';
 import { buildChatToolUserPrompt, CHAT_TOOL_SYSTEM_PROMPT } from './prompts.js';
 import { partitionTools, executeToolBatch, formatToolResults } from './orchestration.js';
+
+const MAX_TOOL_RESULT_LENGTH = 8000;
+const MAX_MESSAGE_HISTORY = 20;
+const MAX_RETRIES = 2;
 
 function isToolAction(action) {
   return action && action.type === 'tool' && typeof action.tool === 'string';
@@ -8,6 +13,34 @@ function isToolAction(action) {
 
 function isFinalAction(action) {
   return action && action.type === 'final' && typeof action.reply === 'string';
+}
+
+function truncateToolResult(name, result) {
+  const serialized = JSON.stringify(result, null, 2);
+  if (serialized.length <= MAX_TOOL_RESULT_LENGTH) {
+    return `TOOL_RESULT: ${name}\n${serialized}`;
+  }
+  // Truncate smartly: keep structure, trim long strings
+  if (result.data && result.data.content && result.data.content.length > MAX_TOOL_RESULT_LENGTH / 2) {
+    result = {
+      ...result,
+      data: {
+        ...result.data,
+        content: result.data.content.slice(0, MAX_TOOL_RESULT_LENGTH / 2) + '\n...[truncated]',
+        truncated: true,
+      }
+    };
+  } else if (result.data && result.data.stdout && result.data.stdout.length > MAX_TOOL_RESULT_LENGTH / 2) {
+    result = {
+      ...result,
+      data: {
+        ...result.data,
+        stdout: result.data.stdout.slice(0, MAX_TOOL_RESULT_LENGTH / 2) + '\n...[truncated]',
+        truncated: true,
+      }
+    };
+  }
+  return `TOOL_RESULT: ${name}\n${truncateToWidth(JSON.stringify(result, null, 2), MAX_TOOL_RESULT_LENGTH)}`;
 }
 
 export async function runChatToolAgent({
@@ -23,7 +56,7 @@ export async function runChatToolAgent({
   maxOutputTokens = 16000,
   maxSteps = 6
 }) {
-  const messages = [
+  let messages = [
     {
       role: 'user',
       content: buildChatToolUserPrompt({
@@ -47,7 +80,6 @@ export async function runChatToolAgent({
 
     // Try to extract multiple JSON objects for parallel tool calls
     const actions = extractMultipleJsonObjects(raw);
-
     messages.push({ role: 'assistant', content: raw });
 
     if (!actions.length) {
@@ -64,19 +96,13 @@ export async function runChatToolAgent({
         });
         continue;
       }
-      // Execute single tool
-      try {
-        const result = await toolbox.runTool(action.tool, action.args || {});
-        messages.push({
-          role: 'user',
-          content: `TOOL_RESULT ${action.tool}\n${JSON.stringify(result, null, 2)}`
-        });
-      } catch (error) {
-        messages.push({
-          role: 'user',
-          content: `TOOL_RESULT ${action.tool}\n${JSON.stringify({ ok: false, error: error.message }, null, 2)}`
-        });
-      }
+      // Execute single tool with retry
+      const result = await executeWithRetry(toolbox, action.tool, action.args || {});
+      messages.push({
+        role: 'user',
+        content: truncateToolResult(action.tool, result)
+      });
+      messages = trimMessageHistory(messages);
       continue;
     }
 
@@ -103,30 +129,53 @@ export async function runChatToolAgent({
     // Execute concurrent tools in parallel
     const allResults = [];
     if (concurrent.length) {
-      const batchResults = await executeToolBatch(concurrent, toolbox.runTool.bind(toolbox));
+      const batchResults = await executeToolBatch(concurrent, (name, args) =>
+        executeWithRetry(toolbox, name, args)
+      );
       allResults.push(...batchResults);
     }
     // Execute sequential tools one by one
     for (const toolUse of sequential) {
-      try {
-        const data = await toolbox.runTool(toolUse.name, toolUse.args || {});
-        allResults.push({ name: toolUse.name, ok: true, data });
-      } catch (error) {
-        allResults.push({
-          name: toolUse.name,
-          ok: false,
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
+      const result = await executeWithRetry(toolbox, toolUse.name, toolUse.args || {});
+      allResults.push(result);
     }
 
     messages.push({
       role: 'user',
       content: formatToolResults(allResults)
     });
+    messages = trimMessageHistory(messages);
   }
 
   return '已达到工具调用最大步数，建议你把任务拆小后重试。';
+}
+
+async function executeWithRetry(toolbox, toolName, args, maxRetries = MAX_RETRIES) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const data = await toolbox.runTool(toolName, args);
+      return { name: toolName, ok: data ? true : false, data };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (attempt < maxRetries && isTransientError(error)) {
+        continue;
+      }
+      return { name: toolName, ok: false, error: message };
+    }
+  }
+  return { name: toolName, ok: false, error: 'Max retries exceeded' };
+}
+
+function isTransientError(error) {
+  const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return msg.includes('eagain') || msg.includes('etimedout') || msg.includes('econnrefused');
+}
+
+function trimMessageHistory(messages) {
+  if (messages.length <= MAX_MESSAGE_HISTORY * 2) return messages;
+  // Keep the first (system prompt context) and last N messages
+  const keep = [messages[0], ...messages.slice(-MAX_MESSAGE_HISTORY)];
+  return keep;
 }
 
 export function extractMultipleJsonObjects(text) {

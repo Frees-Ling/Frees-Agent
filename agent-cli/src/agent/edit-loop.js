@@ -1,6 +1,8 @@
-import { extractFirstJsonObject, truncateForModel } from '../utils/json.js';
+import { extractFirstJsonObject } from '../utils/json.js';
 import { buildEditUserPrompt, EDIT_AGENT_SYSTEM_PROMPT } from './prompts.js';
 import { createAgentToolbox } from './tools.js';
+
+const MAX_TOOL_RESULT_LENGTH = 8000;
 
 function isToolAction(action) {
   return action && action.type === 'tool' && typeof action.tool === 'string';
@@ -11,10 +13,21 @@ function isFinalAction(action) {
 }
 
 function formatToolResult(name, result) {
-  return [
-    `TOOL_RESULT: ${name}`,
-    truncateForModel(JSON.stringify(result, null, 2), 7000)
-  ].join('\n');
+  const serialized = JSON.stringify(result, null, 2);
+  if (serialized.length <= MAX_TOOL_RESULT_LENGTH) {
+    return `TOOL_RESULT: ${name}\n${serialized}`;
+  }
+  // Truncate long content fields
+  if (result.data?.content?.length > MAX_TOOL_RESULT_LENGTH / 2) {
+    result.data.content = result.data.content.slice(0, MAX_TOOL_RESULT_LENGTH / 2) + '\n...[truncated]';
+    result.data.truncated = true;
+  }
+  return `TOOL_RESULT: ${name}\n${truncateToWidth(JSON.stringify(result, null, 2), MAX_TOOL_RESULT_LENGTH)}`;
+}
+
+function truncateToWidth(str, max) {
+  if (str.length <= max) return str;
+  return str.slice(0, max - 100) + '\n...[truncated]';
 }
 
 export async function runEditAgent({

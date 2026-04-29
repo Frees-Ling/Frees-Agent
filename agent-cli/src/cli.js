@@ -1,10 +1,13 @@
 import { parseArgs } from 'node:util';
 import { runChatCommand } from './commands/chat.js';
+import { runCompactCommand } from './commands/compact.js';
 import { runCompleteCommand } from './commands/complete.js';
 import { runConfigCommand } from './commands/config.js';
+import { runCostCommand } from './commands/cost.js';
 import { runDocsCommand } from './commands/docs.js';
 import { runDoctorCommand } from './commands/doctor.js';
 import { runEditCommand } from './commands/edit.js';
+import { runFilesCommand } from './commands/files.js';
 import { runMemoryCommand } from './commands/memory.js';
 import { runPermissionsCommand } from './commands/permissions.js';
 import { runSkillsCommand } from './commands/skills.js';
@@ -37,6 +40,9 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
   frees-agent docs [topic]
   frees-agent permissions
   frees-agent skills [skill-name]
+  frees-agent compact --model <name> [--session name]
+  frees-agent cost [--model name] [--context-window num]
+  frees-agent files <workspace> [--limit num] [--pattern glob]
 
 通用参数：
   --provider anthropic|ollama|openai-compatible|mcp
@@ -388,6 +394,80 @@ export async function main(argv = process.argv.slice(2)) {
     await runSkillsCommand({
       workspace: parsed.values.workspace,
       topic: parsed.positionals[0]
+    });
+    return;
+  }
+
+  if (command === 'compact') {
+    const parsed = parseArgs({
+      args: argv.slice(1),
+      allowPositionals: true,
+      options: {
+        session: { type: 'string', short: 's' },
+        model: { type: 'string' },
+        provider: { type: 'string' },
+        'api-key': { type: 'string' },
+        'api-key-env': { type: 'string' },
+        'base-url': { type: 'string' },
+        workspace: { type: 'string', short: 'w' },
+        config: { type: 'string' },
+        help: { type: 'boolean', short: 'h' }
+      }
+    });
+    if (parsed.values.help) { printHelp(); return; }
+    await runCompactCommand({
+      configPath: parsed.values.config,
+      workspace: parsed.values.workspace,
+      session: parsed.values.session,
+      model: parsed.values.model,
+      provider: parsed.values.provider,
+      apiKey: parsed.values['api-key'],
+      apiKeyEnv: parsed.values['api-key-env'],
+      baseUrl: parsed.values['base-url']
+    });
+    return;
+  }
+
+  if (command === 'cost') {
+    const parsed = parseArgs({
+      args: argv.slice(1),
+      allowPositionals: true,
+      options: {
+        model: { type: 'string' },
+        'context-window': { type: 'string' },
+        session: { type: 'string', short: 's' },
+        workspace: { type: 'string', short: 'w' },
+        config: { type: 'string' },
+        help: { type: 'boolean', short: 'h' }
+      }
+    });
+    if (parsed.values.help) { printHelp(); return; }
+    await runCostCommand({
+      configPath: parsed.values.config,
+      workspace: parsed.values.workspace,
+      session: parsed.values.session,
+      model: parsed.values.model,
+      contextWindow: parsed.values['context-window'] ? Number(parsed.values['context-window']) : undefined
+    });
+    return;
+  }
+
+  if (command === 'files') {
+    const parsed = parseArgs({
+      args: argv.slice(1),
+      allowPositionals: true,
+      options: {
+        workspace: { type: 'string', short: 'w' },
+        limit: { type: 'string' },
+        pattern: { type: 'string' },
+        help: { type: 'boolean', short: 'h' }
+      }
+    });
+    if (parsed.values.help) { printHelp(); return; }
+    await runFilesCommand({
+      workspace: parsed.values.workspace ?? parsed.positionals[0],
+      limit: parsed.values.limit ? Number(parsed.values.limit) : undefined,
+      pattern: parsed.values.pattern
     });
     return;
   }

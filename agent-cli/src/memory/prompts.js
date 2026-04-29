@@ -1,39 +1,20 @@
 import { truncateForModel } from '../utils/json.js';
 
 export const MEMORY_EXTRACT_SYSTEM_PROMPT = `
-你是 Frees Agent 的长期记忆提取器。
+你是一个长期记忆提取器，从对话中提取值得持久化的用户信息。
 
-你的任务是从一轮对话里提取“值得长期保存”的用户信息，并且只返回一个 JSON 对象。
+规则:
+1. 只提取稳定、有价值、后续会用的信息，忽略一次性闲聊
+2. 如果没有提取到新记忆，profilePatch 返回空对象{}，durableMemories返回空数组[]
+3. profilePatch 只放用户画像字段
+4. durableMemories 放目标/偏好/约束/项目背景等
+5. 提问句不是事实，"我叫什么名字"不能提取为name
+6. 绝对别把疑问词写入name字段
 
-规则：
-1. 只提取稳定、有价值、之后还会用到的信息。
-2. 不要保存一次性的闲聊噪音。
-3. 如果没有新增记忆，也必须返回合法 JSON。
-4. profilePatch 里只放用户画像相关字段。
-5. durableMemories 里放长期偏好、目标、约束、项目背景等。
-6. 提问句不是事实，例如“我叫什么名字”“你知道我是谁吗”不能被提取成 name。
-7. 绝对不要把“什么名字吗”“谁吗”这类疑问词写进 profilePatch.name。
-
-返回格式：
+返回JSON:
 {
-  "profilePatch": {
-    "name": "",
-    "role": "",
-    "bio": "",
-    "language": "",
-    "goals": [],
-    "preferences": [],
-    "skills": [],
-    "stack": [],
-    "constraints": [],
-    "interests": []
-  },
-  "durableMemories": [
-    {
-      "category": "profile|goal|preference|constraint|project|workflow",
-      "content": "..."
-    }
-  ]
+  "profilePatch": {"name":"","role":"","bio":"","language":"","goals":[],"preferences":[],"skills":[],"stack":[],"constraints":[],"interests":[]},
+  "durableMemories":[{"category":"goal|preference|constraint|project|workflow|tech","content":"..."}]
 }
 `;
 
@@ -43,50 +24,36 @@ export function buildMemoryExtractionPrompt({
   userMessage,
   assistantMessage
 }) {
-  return `
-当前用户画像：
-${JSON.stringify(profile || {}, null, 2)}
+  const profileStr = Object.keys(profile || {}).length
+    ? JSON.stringify(profile, Object.keys(profile).filter(k => profile[k]), 2)
+    : '(空)';
+  const memoryStr = Array.isArray(durableMemories) && durableMemories.length
+    ? durableMemories.slice(0, 15).map(m => `[${m.category}] ${m.content}`).join('\n')
+    : '(空)';
 
-当前长期记忆：
-${JSON.stringify(durableMemories || [], null, 2)}
-
-本轮用户消息：
-${userMessage}
-
-本轮助手回复：
-${truncateForModel(assistantMessage, 4000)}
-`.trim();
+  return [
+    `当前画像:\n${profileStr}`,
+    `当前记忆:\n${memoryStr}`,
+    `用户:\n${userMessage}`,
+    `助手:\n${truncateForModel(assistantMessage, 2000)}`
+  ].join('\n\n');
 }
 
 export const SUMMARY_SYSTEM_PROMPT = `
-你是 Frees Agent 的长对话压缩器。
+你是长对话压缩器。把较早的聊天历史压缩为忠实、可用的摘要。
 
-你的任务是把较早的聊天历史压缩成忠实、可继续使用的摘要。
+要求：只输出JSON。保留用户目标、约束、决定、待办、关键上下文。不要编造事实。
 
-要求：
-1. 只输出一个 JSON 对象。
-2. 保留用户目标、约束、已做决定、待办事项、关键上下文。
-3. 不要编造事实。
-4. 摘要要能支持后续超长对话继续进行。
-
-返回格式：
-{
-  "summary": "压缩后的连续摘要",
-  "keyFacts": ["..."],
-  "openLoops": ["..."]
-}
+返回格式:
+{"summary":"压缩摘要","keyFacts":["..."],"openLoops":["..."]}
 `;
 
 export function buildSummaryPrompt({ existingSummary, messagesToSummarize }) {
-  return `
-已有摘要：
-${existingSummary || '暂无'}
+  const history = messagesToSummarize
+    .map(m => `${m.role === 'user' ? 'U' : 'A'}: ${truncateForModel(m.content, 1200)}`)
+    .join('\n');
 
-需要继续压缩的历史消息：
-${messagesToSummarize
-  .map(message => `${message.role.toUpperCase()}: ${truncateForModel(message.content, 2000)}`)
-  .join('\n\n')}
-`.trim();
+  return `已有摘要:\n${existingSummary || '(无)'}\n\n需要压缩:\n${history}`;
 }
 
 export function buildMemoryContext({
@@ -97,72 +64,58 @@ export function buildMemoryContext({
   tasks = []
 }) {
   const sections = [];
-  const profileSummary = profile
-    ? {
-        name: profile.name,
-        nickname: profile.nickname,
-        goals: (profile.goals || []).slice(0, 6),
-        skills: (profile.skills || []).slice(0, 10),
-        stack: (profile.stack || []).slice(0, 10),
-        preferences: (profile.preferences || []).slice(0, 8),
-        interests: (profile.interests || []).slice(0, 8),
-        persona: profile.persona,
-        projects: profile?.projects?.current
-          ? { current: profile.projects.current.slice(0, 4) }
-          : undefined
-      }
-    : {};
 
+  // Compress profile: only include non-empty fields, limit array lengths
   if (profile && Object.keys(profile).length > 0) {
-    sections.push(
-      `用户画像:\n${truncateForModel(JSON.stringify(profileSummary, null, 2), 2400)}`
-    );
+    const compact = {};
+    const name = profile.name || profile.nickname;
+    if (name) compact.n = name;
+    if (profile.role) compact.r = profile.role;
+    if (profile.language) compact.l = profile.language;
+    if (profile.persona) compact.p = profile.persona;
+
+    const goals = (profile.goals || []).slice(0, 4);
+    const skills = (profile.skills || []).slice(0, 6);
+    const stack = (profile.stack || []).slice(0, 6);
+    const prefs = (profile.preferences || []).slice(0, 4);
+    const interests = (profile.interests || []).slice(0, 4);
+
+    if (goals.length) compact.g = goals;
+    if (skills.length) compact.s = skills;
+    if (stack.length) compact.st = stack;
+    if (prefs.length) compact.pf = prefs;
+    if (interests.length) compact.i = interests;
+
+    sections.push(`画像: ${truncateForModel(JSON.stringify(compact), 1600)}`);
   }
 
+  // Durable memories: limit to 8 most relevant
   if (durableMemories?.length) {
+    const items = durableMemories.slice(0, 8);
     sections.push(
-      `长期记忆:\n${durableMemories
-        .slice(0, 10)
-        .map(
-          (item, index) =>
-            `${index + 1}. [${item.category}] ${truncateForModel(item.content || '', 140)}`
-        )
-        .join('\n')}`
+      `记忆:\n${items.map((m, i) => `${i + 1}. [${m.category}] ${truncateForModel(m.content || '', 120)}`).join('\n')}`
     );
   }
 
   if (sessionSummary) {
-    sections.push(`长对话摘要:\n${sessionSummary}`);
+    sections.push(`摘要:\n${sessionSummary}`);
   }
 
   if (semanticMemories?.length) {
+    const items = semanticMemories.slice(0, 4);
     sections.push(
-      `语义召回记忆:\n${semanticMemories
-        .slice(0, 6)
-        .map(
-          (item, index) =>
-            `${index + 1}. [${item.category}] ${truncateForModel(item.content || '', 140)}`
-        )
-        .join('\n')}`
+      `召回:\n${items.map((m, i) => `${i + 1}. [${m.category}] ${truncateForModel(m.content || '', 120)}`).join('\n')}`
     );
   }
 
   if (tasks?.length) {
+    const items = tasks.slice(0, 6);
     sections.push(
-      `任务记忆:\n${tasks
-        .slice(0, 8)
-        .map((task, index) => `${index + 1}. [${task.status}] ${task.title}`)
-        .join('\n')}`
+      `任务:\n${items.map((t, i) => `${i + 1}. [${t.status}] ${t.title}`).join('\n')}`
     );
   }
 
-  if (!sections.length) {
-    return '';
-  }
+  if (!sections.length) return '';
 
-  return `
-以下是 Frees Agent 持久化记忆与长对话上下文。回答时请参考，但不要臆造记忆中没有的信息。
-
-${sections.join('\n\n')}
-`.trim();
+  return `[记忆] ${sections.join(' | ')}`;
 }

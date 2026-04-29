@@ -2,11 +2,12 @@
 // Reference: Claude Code CLI src/services/tools/toolOrchestration.ts
 
 const READONLY_TOOLS = new Set([
-  'list_files',
-  'search_text',
-  'read_file',
+  'list_files', 'glob',
+  'search_text', 'grep',
+  'read_file', 'read',
   'web_search',
-  'list_mcp_tools'
+  'web_fetch', 'fetch',
+  'list_mcp_tools',
 ]);
 
 function isReadOnlyTool(name) {

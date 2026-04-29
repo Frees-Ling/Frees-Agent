@@ -19,9 +19,7 @@ import {
 } from './prompts.js';
 
 function normalizeSummaryPayload(payload) {
-  if (!payload) {
-    return '';
-  }
+  if (!payload) return '';
   if (typeof payload.summary === 'string' && payload.summary.trim()) {
     const parts = [payload.summary.trim()];
     if (Array.isArray(payload.keyFacts) && payload.keyFacts.length) {
@@ -37,9 +35,7 @@ function normalizeSummaryPayload(payload) {
 
 export function buildChatSystemPrompt({ baseSystemPrompt, state, config }) {
   const memoryEnabled = config?.memory?.enabled !== false;
-  if (!memoryEnabled) {
-    return baseSystemPrompt;
-  }
+  if (!memoryEnabled) return baseSystemPrompt;
 
   const memoryContext = buildMemoryContext({
     profile: config?.memory?.includeUserProfile === false ? {} : state.profile,
@@ -50,11 +46,9 @@ export function buildChatSystemPrompt({ baseSystemPrompt, state, config }) {
     tasks: state.tasks || []
   });
 
-  if (!memoryContext) {
-    return baseSystemPrompt;
-  }
+  if (!memoryContext) return baseSystemPrompt;
 
-  return `${baseSystemPrompt}\n\n${memoryContext}`.trim();
+  return `${baseSystemPrompt}\n${memoryContext}`.trim();
 }
 
 export async function updateMemoryAfterTurn({
@@ -66,13 +60,13 @@ export async function updateMemoryAfterTurn({
   temperature = 0
 }) {
   appendTurnToSession(state, userMessage, assistantMessage);
+
+  // Local heuristic extraction (zero token cost)
   mergeMemoryExtraction(
     state,
     mergeMemoryExtractions(
       inferLocalMemory(userMessage),
-      {
-        profilePatch: extractProfileFromText(userMessage)
-      }
+      { profilePatch: extractProfileFromText(userMessage) }
     ),
     config
   );
@@ -84,45 +78,46 @@ export async function updateMemoryAfterTurn({
     return;
   }
 
+  // LLM-assisted extraction (spent tokens, high value)
   try {
     const raw = await client.generateText({
       systemPrompt: MEMORY_EXTRACT_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: buildMemoryExtractionPrompt({
-            profile: state.profile,
-            durableMemories: state.durableMemories,
-            userMessage,
-            assistantMessage
-          })
-        }
-      ],
+      messages: [{
+        role: 'user',
+        content: buildMemoryExtractionPrompt({
+          profile: state.profile,
+          durableMemories: state.durableMemories,
+          userMessage,
+          assistantMessage
+        })
+      }],
       temperature,
       maxOutputTokens: 1200
     });
     const extraction = extractFirstJsonObject(raw);
     mergeMemoryExtraction(state, mergeMemoryExtractions(extraction), config);
   } catch {
-    // Ignore extraction failures to avoid breaking the main chat loop.
+    // Extraction failures don't break the main loop
   }
 
-  if (config?.memory?.vectorMemory?.enabled !== false) {
+  // Vector index is optional; skip if no durable memories
+  if (config?.memory?.vectorMemory?.enabled !== false && state.durableMemories.length > 0) {
     await upsertDurableMemoriesToVectorIndex(
       state.store.vectorMemoryPath,
-      state.durableMemories || []
+      state.durableMemories
     );
   }
+
   await saveTaskMemory(state.store.taskMemoryPath, state.tasks || []);
   await saveMemoryState(state);
 }
 
-export async function attachSemanticMemoriesToState({
-  state,
-  query,
-  config
-}) {
+export async function attachSemanticMemoriesToState({ state, query, config }) {
   if (config?.memory?.vectorMemory?.enabled === false) {
+    state.semanticMemories = [];
+    return;
+  }
+  if (!query || !state.durableMemories.length) {
     state.semanticMemories = [];
     return;
   }
@@ -133,12 +128,7 @@ export async function attachSemanticMemoriesToState({
   );
 }
 
-export async function compactConversationIfNeeded({
-  client,
-  state,
-  config,
-  temperature = 0.1
-}) {
+export async function compactConversationIfNeeded({ client, state, config, temperature = 0.1 }) {
   const threshold = config?.conversation?.summarizeAfterMessages ?? 18;
   const keepRecentMessages = config?.conversation?.keepRecentMessages ?? 12;
   const tokenThreshold = config?.conversation?.maxRecentContextTokens ?? 12000;
@@ -159,15 +149,13 @@ export async function compactConversationIfNeeded({
   try {
     const raw = await client.generateText({
       systemPrompt: SUMMARY_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: buildSummaryPrompt({
-            existingSummary: state.session.summary,
-            messagesToSummarize: olderMessages
-          })
-        }
-      ],
+      messages: [{
+        role: 'user',
+        content: buildSummaryPrompt({
+          existingSummary: state.session.summary,
+          messagesToSummarize: olderMessages
+        })
+      }],
       temperature,
       maxOutputTokens: 1800
     });
@@ -180,7 +168,7 @@ export async function compactConversationIfNeeded({
     state.session.recentMessages = keptMessages;
   } catch {
     const fallback = olderMessages
-      .map(message => `${message.role}: ${truncateForModel(message.content, 300)}`)
+      .map(m => `${m.role}: ${truncateForModel(m.content, 300)}`)
       .join('\n');
     state.session.summary = truncateForModel(
       [state.session.summary, fallback].filter(Boolean).join('\n\n'),
@@ -194,14 +182,7 @@ export async function compactConversationIfNeeded({
 
 export function describeMemoryState(state) {
   return {
-    storage: {
-      storageRoot: state.store.storageRoot,
-      profilePath: state.store.profilePath,
-      durableMemoryPath: state.store.durableMemoryPath,
-      vectorMemoryPath: state.store.vectorMemoryPath,
-      taskMemoryPath: state.store.taskMemoryPath,
-      sessionPath: state.store.sessionPath
-    },
+    storage: { storageRoot: state.store.storageRoot },
     profile: state.profile,
     durableMemories: state.durableMemories,
     session: {

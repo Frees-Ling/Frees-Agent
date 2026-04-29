@@ -2,57 +2,72 @@ import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promi
 import path from 'node:path';
 
 const TEXT_EXTENSIONS = new Set([
-  '.js',
-  '.jsx',
-  '.ts',
-  '.tsx',
-  '.mjs',
-  '.cjs',
-  '.json',
-  '.jsonc',
-  '.md',
-  '.mdx',
-  '.txt',
-  '.yml',
-  '.yaml',
-  '.toml',
-  '.ini',
-  '.env',
-  '.sh',
-  '.bash',
-  '.zsh',
-  '.ps1',
-  '.psm1',
-  '.py',
-  '.rb',
-  '.php',
-  '.java',
-  '.kt',
-  '.go',
-  '.rs',
-  '.c',
-  '.cc',
-  '.cpp',
-  '.h',
-  '.hpp',
-  '.cs',
-  '.swift',
-  '.scala',
-  '.sql',
-  '.css',
-  '.scss',
-  '.sass',
-  '.less',
-  '.html',
-  '.xml',
-  '.vue',
-  '.svelte',
-  '.astro',
-  '.lock',
-  '.gitignore',
-  '.gitattributes',
-  '.dockerfile'
+  '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs',
+  '.json', '.jsonc', '.jsonl',
+  '.md', '.mdx', '.txt', '.text',
+  '.yml', '.yaml', '.toml', '.ini', '.cfg', '.conf',
+  '.env', '.gitignore', '.gitattributes', '.gitmodules',
+  '.sh', '.bash', '.zsh', '.fish', '.ps1', '.psm1', '.psd1',
+  '.py', '.rb', '.php', '.java', '.kt', '.kts', '.go', '.rs',
+  '.c', '.cc', '.cpp', '.cxx', '.h', '.hh', '.hpp', '.hxx',
+  '.cs', '.fs', '.fsx',
+  '.swift', '.scala', '.clj', '.cljs', '.edn',
+  '.sql', '.ddl', '.dml',
+  '.css', '.scss', '.sass', '.less', '.styl',
+  '.html', '.htm', '.xhtml', '.xml', '.svg',
+  '.vue', '.svelte', '.astro', '.liquid',
+  '.wasm', '.wat',
+  '.lock', '.patch', '.diff',
+  '.dockerfile', '.Dockerfile',
+  '.makefile', '.Makefile',
+  '.cmake', '.ninja',
+  '.gradle', '.properties',
+  '.lua', '.pl', '.pm', '.t',
+  '.r', '.R',
+  '.m', '.mm',
+  '.hs', '.lhs',
+  '.erl', '.hrl', '.ex', '.exs',
+  '.cr', '.elm',
+  '.zig', '.nim', '.odin',
+  '.proto', '.graphql', '.gql',
+  '.terraform', '.tf', '.tfvars', '.hcl',
+  '.rst', '.asciidoc', '.adoc',
+  '.tex', '.bib',
+  '.log', '.out',
+  '.eslintrc', '.prettierrc', '.babelrc',
+  '.npmrc', '.yarnrc', '.pnpmrc',
+  '.nix',
 ]);
+
+const BINARY_EXTENSIONS = new Set([
+  // Images
+  '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.tiff', '.tif', '.avif', '.heic', '.heif',
+  // Videos
+  '.mp4', '.mov', '.avi', '.mkv', '.webm', '.wmv', '.flv', '.m4v', '.mpeg', '.mpg', '.ogv', '.3gp',
+  // Audio
+  '.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.wma', '.aiff', '.opus', '.mid', '.midi',
+  // Archives
+  '.zip', '.tar', '.gz', '.bz2', '.7z', '.rar', '.xz', '.z', '.tgz', '.lz', '.lzma', '.zst',
+  '.iso', '.dmg', '.img', '.vhd', '.vhdx', '.vmdk',
+  // Executables
+  '.exe', '.dll', '.so', '.dylib', '.bin', '.o', '.a', '.obj', '.lib', '.app', '.msi',
+  '.deb', '.rpm', '.apk', '.appimage', '.snap', '.flatpak',
+  // Documents (binary formats)
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.odt', '.ods', '.odp',
+  // Fonts
+  '.ttf', '.otf', '.woff', '.woff2', '.eot',
+  // Bytecode / compiled
+  '.pyc', '.pyo', '.class', '.jar', '.war', '.ear', '.node', '.wasm', '.rlib', '.pyd',
+  // Database
+  '.sqlite', '.sqlite3', '.db', '.mdb', '.idx', '.dbf',
+  // Design / 3D
+  '.psd', '.ai', '.eps', '.sketch', '.fig', '.blend', '.obj', '.fbx', '.glb', '.gltf',
+  '.stl', '.step', '.iges',
+  // Cache / build artifacts
+  '.map', '.cache', '.tmp',
+]);
+
+const MAX_TEXT_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 function hasBinaryByte(buffer) {
   const sample = buffer.subarray(0, 4096);
@@ -66,6 +81,11 @@ function hasBinaryByte(buffer) {
 
 export function isProbablyTextFile(filePath, buffer) {
   const ext = path.extname(filePath).toLowerCase();
+  // Check explicit binary extensions first
+  if (BINARY_EXTENSIONS.has(ext)) {
+    return false;
+  }
+  // Check known text extensions
   if (TEXT_EXTENSIONS.has(ext)) {
     return true;
   }
@@ -73,6 +93,8 @@ export function isProbablyTextFile(filePath, buffer) {
   if (TEXT_EXTENSIONS.has(base)) {
     return true;
   }
+  // Fall back to content sniffing
+  if (!buffer || buffer.length === 0) return true;
   return !hasBinaryByte(buffer);
 }
 
