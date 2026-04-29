@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nickel-org/tauri/dev/crates/tauri-utils/schema.json",
+  "productName": "Frees-Agent",
+  "version": "2.0.0",
+  "identifier": "com.frees-agent.app",
+  "build": {
+    "frontendDist": "../src/gui/public",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": ""
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Frees-Agent",
+        "width": 1100,
+        "height": 720,
+        "minWidth": 800,
+        "minHeight": 500,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "tooltip": "Frees-Agent"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

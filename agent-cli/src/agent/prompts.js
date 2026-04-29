@@ -59,6 +59,7 @@ const TOOL_DESCRIPTIONS = `
 - Parameters: { "command": "ls -la", "cwd"?: "/path/to/dir", "timeoutMs"?: 30000, "mergeStderr"?: false }
 - Returns stdout, stderr, exit code, and execution duration
 - Use for file operations, git commands, running scripts, and system inspection
+- Can access system info: date/time, processes, disk, memory, network, and environment variables via shell commands
 `;
 
 export const EDIT_AGENT_SYSTEM_PROMPT = `
@@ -129,7 +130,8 @@ export const CHAT_TOOL_SYSTEM_PROMPT = `
 - replace_in_file: 替换文件中的文本（智能引号匹配）
 - web_search: 联网搜索（需配置 TAVILY_API_KEY）
 - web_fetch: 获取 URL 内容（自动转 HTML 为文本）
-- bash: 执行 shell 命令（有安全验证）
+- bash: 执行 shell 命令（有安全验证；可查时间/日期/系统信息/进程/环境变量等）
+- system_info: 获取当前系统时间、日期、平台信息（无需额外配置）
 - mkdir: 创建目录
 - delete_file: 删除文件
 不要输出JSON以外的内容。

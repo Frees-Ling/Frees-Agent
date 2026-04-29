@@ -12,9 +12,25 @@ import { fetchUrl, htmlToBasicText } from '../tools/web-fetch.js';
 import { execShell, validateShellCommand } from '../shell/shell-exec.js';
 import { buildMcpToolHandlers } from '../tools/mcp-client.js';
 
-export function createAgentToolbox(index, { dryRun = false, readOnly = false, config = {} } = {}) {
+export function createAgentToolbox(index, {
+  dryRun = false, readOnly = false, config = {},
+  allowedTools = null, blockedTools = null,
+} = {}) {
   const changes = [];
   let mcpHandlers = null;
+
+  function checkToolPermission(name) {
+    if (allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0) {
+      if (!allowedTools.includes(name)) {
+        throw new Error(`工具 "${name}" 未被当前技能允许。允许的工具: ${allowedTools.join(', ')}`);
+      }
+    }
+    if (blockedTools && Array.isArray(blockedTools) && blockedTools.length > 0) {
+      if (blockedTools.includes(name)) {
+        throw new Error(`工具 "${name}" 已被当前技能禁止使用。`);
+      }
+    }
+  }
 
   function setMcpManager(mcpManager) {
     if (mcpManager) {
@@ -23,6 +39,9 @@ export function createAgentToolbox(index, { dryRun = false, readOnly = false, co
   }
 
   async function runTool(name, args = {}) {
+    // Check tool permissions
+    checkToolPermission(name);
+
     // Try MCP tools first if available
     if (mcpHandlers) {
       const mcpResult = await mcpHandlers.tryHandleMcpTool(name, args);
@@ -150,6 +169,12 @@ export function createAgentToolbox(index, { dryRun = false, readOnly = false, co
         return { ok: true, data: { tools: mcpHandlers.getToolSchemas() } };
       }
 
+      // ---- System info ----
+      case 'system_info': {
+        const { getSystemInfo } = await import('../utils/system-info.js');
+        return { ok: true, data: getSystemInfo() };
+      }
+
       default:
         throw new Error(
           `未知工具: ${name}。可用工具: read_file, search_text, list_files, write_file, replace_in_file, mkdir, delete_file, web_search, web_fetch, bash${mcpHandlers ? ', ' + mcpHandlers.getToolNames().join(', ') : ''}`
@@ -169,6 +194,7 @@ export function createAgentToolbox(index, { dryRun = false, readOnly = false, co
       { name: 'web_search', description: 'Search the web via Tavily' },
       { name: 'web_fetch', description: 'Fetch a URL and get content' },
       { name: 'bash', description: 'Execute a shell command' },
+      { name: 'system_info', description: 'Get current system time, date, platform, and OS info' },
     ];
     if (mcpHandlers) {
       for (const t of mcpHandlers.getToolSchemas()) {

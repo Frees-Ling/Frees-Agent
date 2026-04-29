@@ -7,9 +7,13 @@ import {
   appendTurnToSession,
   getRecentMessagesForModel,
   mergeMemoryExtraction,
-  saveMemoryState
+  saveMemoryState,
+  saveSessionToFile,
+  autoNameSession,
+  listAllSessionFiles
 } from './store.js';
 import { queryVectorMemories, upsertDurableMemoriesToVectorIndex } from './vector.js';
+import { injectSystemClock } from '../utils/system-info.js';
 import {
   buildMemoryContext,
   buildMemoryExtractionPrompt,
@@ -46,9 +50,9 @@ export function buildChatSystemPrompt({ baseSystemPrompt, state, config }) {
     tasks: state.tasks || []
   });
 
-  if (!memoryContext) return baseSystemPrompt;
+  if (!memoryContext) return injectSystemClock(baseSystemPrompt);
 
-  return `${baseSystemPrompt}\n${memoryContext}`.trim();
+  return injectSystemClock(`${baseSystemPrompt}\n${memoryContext}`.trim());
 }
 
 export async function updateMemoryAfterTurn({
@@ -110,6 +114,7 @@ export async function updateMemoryAfterTurn({
 
   await saveTaskMemory(state.store.taskMemoryPath, state.tasks || []);
   await saveMemoryState(state);
+  await saveSessionToFile(state);
 }
 
 export async function attachSemanticMemoriesToState({ state, query, config }) {

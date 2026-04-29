@@ -7,6 +7,9 @@ const MAX_TOOL_RESULT_LENGTH = 8000;
 const MAX_MESSAGE_HISTORY = 20;
 const MAX_RETRIES = 2;
 
+// 连续 JSON 解析失败阈值 — 超过后直接返回 final 避免无限循环
+const MAX_CONSECUTIVE_PARSE_FAILURES = 3;
+
 function isToolAction(action) {
   return action && action.type === 'tool' && typeof action.tool === 'string';
 }
@@ -54,8 +57,18 @@ export async function runChatToolAgent({
   webHint = '',
   temperature = 0.2,
   maxOutputTokens = 16000,
-  maxSteps = 6
+  maxSteps = 6,
+  planSteps = [],
+  onStepProgress = null,
 }) {
+  // Inject plan progress into the conversation context
+  let progressContext = '';
+  if (planSteps.length > 0) {
+    progressContext = planSteps.map((s, i) =>
+      `  Step ${i + 1}/${planSteps.length}: [${s.status}] ${s.description}`
+    ).join('\n');
+  }
+
   let messages = [
     {
       role: 'user',
@@ -64,13 +77,20 @@ export async function runChatToolAgent({
         workspaceOverview,
         relevantFiles,
         memoryHint,
-        planningHint,
+        planningHint: planningHint || (progressContext ? `执行计划:\n${progressContext}` : ''),
         webHint
       })
     }
   ];
 
+  let consecutiveParseFailures = 0;
+
   for (let step = 0; step < maxSteps; step += 1) {
+    if (onStepProgress && planSteps.length > 0) {
+      const currentStepIdx = Math.min(step, planSteps.length - 1);
+      onStepProgress(currentStepIdx + 1, planSteps.length, 'in_progress', planSteps[currentStepIdx]?.description || '');
+    }
+
     const raw = await client.generateText({
       systemPrompt: CHAT_TOOL_SYSTEM_PROMPT,
       messages,
@@ -89,13 +109,19 @@ export async function runChatToolAgent({
         return action.reply;
       }
       if (!isToolAction(action)) {
+        consecutiveParseFailures++;
+        if (consecutiveParseFailures >= MAX_CONSECUTIVE_PARSE_FAILURES) {
+          return '抱歉，模型连续输出非标准格式，无法调用工具。请简化问题后重试。';
+        }
         messages.push({
           role: 'user',
           content:
-            '上一条不是合法 JSON。请只返回 {"type":"tool"...} 或 {"type":"final","reply":"..."}。'
+            `上一条不是合法 JSON（连续第${consecutiveParseFailures}次失败）。请只返回 {"type":"tool"...} 或 {"type":"final","reply":"..."}。`
         });
         continue;
       }
+      // Reset on successful parse
+      consecutiveParseFailures = 0;
       // Execute single tool with retry
       const result = await executeWithRetry(toolbox, action.tool, action.args || {});
       messages.push({
@@ -115,13 +141,18 @@ export async function runChatToolAgent({
     // Partition into concurrent and sequential groups
     const toolActions = actions.filter(isToolAction);
     if (!toolActions.length) {
+      consecutiveParseFailures++;
+      if (consecutiveParseFailures >= MAX_CONSECUTIVE_PARSE_FAILURES) {
+        return '抱歉，模型连续输出非标准格式，无法调用工具。请简化问题后重试。';
+      }
       messages.push({
         role: 'user',
         content:
-          '请只返回 {"type":"tool"...} 或 {"type":"final","reply":"..."}。'
+          `请只返回 {"type":"tool"...} 或 {"type":"final","reply":"..."}。（连续第${consecutiveParseFailures}次）`
       });
       continue;
     }
+    consecutiveParseFailures = 0;
 
     const toolUses = toolActions.map(a => ({ name: a.tool, args: a.args || {} }));
     const { concurrent, sequential } = partitionTools(toolUses);
@@ -168,7 +199,12 @@ async function executeWithRetry(toolbox, toolName, args, maxRetries = MAX_RETRIE
 
 function isTransientError(error) {
   const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
-  return msg.includes('eagain') || msg.includes('etimedout') || msg.includes('econnrefused');
+  return msg.includes('eagain') || msg.includes('etimedout') || msg.includes('econnrefused')
+    || msg.includes('timeout') || msg.includes('socket') || msg.includes('network')
+    || msg.includes('econnreset') || msg.includes('ehostunreach') || msg.includes('enotfound')
+    || msg.includes('429') || msg.includes('503') || msg.includes('502')
+    || msg.includes('too many requests') || msg.includes('rate limit')
+    || msg.includes('internal server error') || msg.includes('bad gateway');
 }
 
 function trimMessageHistory(messages) {

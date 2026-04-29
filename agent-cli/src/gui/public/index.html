@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frees-Agent</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div id="sidebar-header">
+      <button id="new-chat-btn" title="新对话">＋ 新对话</button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title" data-toggle="history-list">对话历史</div>
+      <div id="history-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title" data-toggle="panel-skills">技能 (SKILL)</div>
+      <div id="panel-skills" class="sidebar-panel"><div class="panel-empty">暂无技能</div></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title" data-toggle="panel-tools">可用工具</div>
+      <div id="panel-tools" class="sidebar-panel"><div class="panel-empty">暂无工具</div></div>
+    </div>
+
+    <div id="sidebar-footer">
+      <div id="connection-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusLabel">初始化...</span>
+      </div>
+      <div id="sidebar-actions">
+        <button class="icon-btn" id="btn-settings" title="设置">⚙</button>
+        <button class="icon-btn" id="btn-system" title="系统信息">📊</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main id="main">
+    <header id="chat-header">
+      <div id="model-badge">
+        <span id="modelName">—</span>
+        <span class="badge" id="providerName">—</span>
+      </div>
+      <div id="header-status">
+        <span id="memoryCount" class="badge">记忆 0</span>
+        <span id="tokenCount" class="badge">0 tokens</span>
+      </div>
+    </header>
+
+    <!-- Messages -->
+    <div id="messages">
+      <div class="welcome" id="welcomeScreen">
+        <div class="welcome-icon">◆</div>
+        <h2>Frees-Agent</h2>
+        <p>AI 智能助手 · 跨平台桌面版</p>
+        <div class="welcome-tips">
+          <span>📝 提问、编程、分析</span>
+          <span>🔧 执行命令、管理系统</span>
+          <span>🧠 持久化记忆、自动学习</span>
+          <span>📂 浏览文件、读写代码</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div id="input-area">
+      <div id="input-toolbar">
+        <span id="inputStatus" class="input-status"></span>
+      </div>
+      <div id="input-row">
+        <textarea id="message-input" rows="1" placeholder="输入消息，Enter 发送，Shift+Enter 换行" enterkeyhint="send"></textarea>
+        <button id="send-btn" disabled>
+          <span class="send-icon">➤</span>
+        </button>
+        <button id="stop-btn" class="hidden">
+          <span class="stop-icon">■</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- System Monitor Panel (slide-in) -->
+  <div id="system-panel" class="slide-panel hidden">
+    <div class="panel-header">
+      <h3>系统监控</h3>
+      <button class="icon-btn close-panel">✕</button>
+    </div>
+    <div class="panel-body" id="systemPanelBody">
+      <div class="metric"><label>平台</label><span id="sysPlatform">—</span></div>
+      <div class="metric"><label>架构</label><span id="sysArch">—</span></div>
+      <div class="metric"><label>系统</label><span id="sysOS">—</span></div>
+      <div class="metric"><label>主机名</label><span id="sysHostname">—</span></div>
+      <div class="metric"><label>运行时间</label><span id="sysUptime">—</span></div>
+      <div class="metric"><label>CPU</label><span id="sysCPU">—</span></div>
+      <div class="metric bar-metric">
+        <label>内存</label>
+        <div class="bar-container"><div class="bar-fill" id="memBar"></div></div>
+        <span id="memText">—</span>
+      </div>
+      <div class="metric bar-metric">
+        <label>磁盘</label>
+        <div class="bar-container"><div class="bar-fill" id="diskBar"></div></div>
+        <span id="diskText">—</span>
+      </div>
+      <div class="metric"><label>进程</label><span id="sysProcesses">—</span></div>
+    </div>
+  </div>
+
+  <!-- Settings Panel (slide-in) -->
+  <div id="settings-panel" class="slide-panel hidden">
+    <div class="panel-header">
+      <h3>设置</h3>
+      <button class="icon-btn close-panel">✕</button>
+    </div>
+    <div class="panel-body">
+      <div class="setting-item">
+        <label>模型 Provider</label>
+        <select id="settingProvider">
+          <option value="anthropic">Anthropic</option>
+          <option value="openai-compatible">OpenAI Compatible</option>
+          <option value="ollama">Ollama</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label>模型名称</label>
+        <input type="text" id="settingModel" placeholder="claude-opus-4-7">
+      </div>
+      <div class="setting-item">
+        <label>温度</label>
+        <input type="range" id="settingTemp" min="0" max="2" step="0.1" value="0.7">
+        <span id="tempLabel">0.7</span>
+      </div>
+      <div class="setting-item">
+        <label>流式输出</label>
+        <label class="toggle"><input type="checkbox" id="settingStream" checked><span class="slider"></span></label>
+      </div>
+      <div class="setting-item">
+        <label>规划器</label>
+        <label class="toggle"><input type="checkbox" id="settingPlanner" checked><span class="slider"></span></label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay -->
+<div id="overlay" class="hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

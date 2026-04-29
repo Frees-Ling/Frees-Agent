@@ -543,3 +543,83 @@ export async function clearAllSessionFiles(storeRoot) {
     }
   } catch { /* ignore */ }
 }
+
+// ─── Enhanced Session Persistence ───
+
+function getSessionsDir(storageRoot) {
+  return path.join(storageRoot, 'sessions');
+}
+
+/**
+ * Save session to a separate file for independent management.
+ */
+export async function saveSessionToFile(state) {
+  const sessionsDir = getSessionsDir(state.store.storageRoot);
+  await mkdir(sessionsDir, { recursive: true });
+  const sessionFile = path.join(sessionsDir, `${state.session.id}.json`);
+  await writeFile(sessionFile, JSON.stringify({
+    id: state.session.id,
+    name: state.session.name,
+    workspaceRoot: state.session.workspaceRoot,
+    createdAt: state.session.createdAt,
+    updatedAt: new Date().toISOString(),
+    totalTurns: state.session.totalTurns,
+    summary: state.session.summary,
+    recentMessages: state.session.recentMessages,
+  }, null, 2) + '\n', 'utf8');
+}
+
+/**
+ * Load a specific session file by ID.
+ */
+export async function loadSessionFromFile(storageRoot, sessionId) {
+  const sessionFile = path.join(getSessionsDir(storageRoot), `${sessionId}.json`);
+  try {
+    return JSON.parse(await readFile(sessionFile, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * List all session files in the sessions directory.
+ */
+export async function listAllSessionFiles(storageRoot) {
+  const sessionsDir = getSessionsDir(storageRoot);
+  try {
+    const entries = await readdir(sessionsDir);
+    const sessions = [];
+    for (const entry of entries.filter(e => e.endsWith('.json'))) {
+      try {
+        const data = JSON.parse(await readFile(path.join(sessionsDir, entry), 'utf8'));
+        sessions.push({
+          id: data.id,
+          name: data.name,
+          totalTurns: data.totalTurns,
+          updatedAt: data.updatedAt,
+          summary: (data.summary || '').slice(0, 80),
+        });
+      } catch { /* skip corrupt files */ }
+    }
+    sessions.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    return sessions;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Auto-generate a session name from the first user message.
+ */
+export function autoNameSession(firstMessage, existingNames = []) {
+  const clean = String(firstMessage || '')
+    .replace(/[^\p{L}\p{N}\s_-]/gu, '')
+    .trim()
+    .slice(0, 40);
+  if (!clean) return `session-${Date.now()}`;
+  const slug = clean.toLowerCase().replace(/\s+/g, '-');
+  if (!existingNames.includes(slug)) return slug;
+  let suffix = 1;
+  while (existingNames.includes(`${slug}-${suffix}`)) suffix++;
+  return `${slug}-${suffix}`;
+}

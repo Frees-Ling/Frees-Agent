@@ -11,11 +11,13 @@ import { runFilesCommand } from './commands/files.js';
 import { runMemoryCommand } from './commands/memory.js';
 import { runPermissionsCommand } from './commands/permissions.js';
 import { runSkillsCommand } from './commands/skills.js';
+import { runTasksCommand } from './commands/tasks.js';
+import { runGuiCommand } from './commands/gui.js';
 
 const HELP_TEXT = `
-Frees Agent
+Frees-Agent
 
-Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
+Frees-Agent 是一个跨平台终端 AI Agent CLI，支持：
 - 终端聊天问答
 - 基于工作区上下文的代码理解与代码补全
 - 自动扫描指定文件夹并阅读全部可载入代码
@@ -25,9 +27,9 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
 - 聊天支持实时流式回复输出
 - 持久化记忆、用户画像和超长对话摘要压缩
 - 内置中文文档区，可直接查看 LLM/训练/API 接入说明
-- 加载成功后显示 Frees Agent 特色横幅
+- 加载成功后显示 Frees-Agent 特色横幅
 - 提供系统权限与电脑控制引导
-- 支持 skill 文件类型（SKILL.md）
+- 支持 skill 文件类型（SKILD.md）
 
 命令：
   frees-agent chat [workspace] [--message "..."]
@@ -43,6 +45,8 @@ Frees Agent 是一个跨平台终端 AI Agent CLI，支持：
   frees-agent compact --model <name> [--session name]
   frees-agent cost [--model name] [--context-window num]
   frees-agent files <workspace> [--limit num] [--pattern glob]
+  frees-agent tasks list|status|cancel|clear
+  frees-agent gui [--port 7780] [--host 0.0.0.0]
 
 通用参数：
   --provider anthropic|ollama|openai-compatible|mcp
@@ -65,8 +69,15 @@ function printHelp() {
 export async function main(argv = process.argv.slice(2)) {
   const command = argv[0];
 
-  if (!command || command === 'help' || command === '--help' || command === '-h') {
+  if (command === 'help' || command === '--help' || command === '-h') {
     printHelp();
+    return;
+  }
+
+  // No command → launch GUI
+  if (!command) {
+    const { runGuiCommand } = await import('./commands/gui.js');
+    await runGuiCommand({});
     return;
   }
 
@@ -468,6 +479,56 @@ export async function main(argv = process.argv.slice(2)) {
       workspace: parsed.values.workspace ?? parsed.positionals[0],
       limit: parsed.values.limit ? Number(parsed.values.limit) : undefined,
       pattern: parsed.values.pattern
+    });
+    return;
+  }
+
+  if (command === 'tasks') {
+    const parsed = parseArgs({
+      args: argv.slice(1),
+      allowPositionals: true,
+      options: {
+        help: { type: 'boolean', short: 'h' }
+      }
+    });
+    if (parsed.values.help) { printHelp(); return; }
+    await runTasksCommand({
+      subcommand: parsed.positionals[0],
+      args: parsed.positionals.slice(1)
+    });
+    return;
+  }
+
+  if (command === 'gui') {
+    const parsed = parseArgs({
+      args: argv.slice(1),
+      allowPositionals: true,
+      options: {
+        port: { type: 'string', short: 'p' },
+        host: { type: 'string' },
+        workspace: { type: 'string', short: 'w' },
+        provider: { type: 'string' },
+        model: { type: 'string' },
+        'base-url': { type: 'string' },
+        'api-key': { type: 'string' },
+        'api-key-env': { type: 'string' },
+        config: { type: 'string' },
+        session: { type: 'string' },
+        help: { type: 'boolean', short: 'h' }
+      }
+    });
+    if (parsed.values.help) { printHelp(); return; }
+    await runGuiCommand({
+      port: parsed.values.port ? Number(parsed.values.port) : undefined,
+      host: parsed.values.host,
+      workspace: parsed.values.workspace ?? parsed.positionals[0],
+      provider: parsed.values.provider,
+      model: parsed.values.model,
+      baseUrl: parsed.values['base-url'],
+      apiKey: parsed.values['api-key'],
+      apiKeyEnv: parsed.values['api-key-env'],
+      configPath: parsed.values.config,
+      session: parsed.values.session,
     });
     return;
   }

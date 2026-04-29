@@ -1,7 +1,13 @@
 import { extractFirstJsonObject, truncateForModel } from '../utils/json.js';
 import { hasUltraplanKeyword } from '../utils/ultraplan/keyword.js';
 
-export async function buildExecutionPlan({
+// ─── 多步任务分解 ───
+
+/**
+ * Build a structured execution plan with step tracking metadata.
+ * Returns { steps: [{description, status}], complexity, toolsNeeded, risks } or null.
+ */
+export async function buildStructuredPlan({
   plannerClient,
   message,
   workspaceOverview,
@@ -11,12 +17,21 @@ export async function buildExecutionPlan({
   const effectiveEnabled = enabled || ultraplan;
 
   if (!effectiveEnabled || !plannerClient) {
-    return '';
+    return null;
   }
 
   const planPrompt = ultraplan
-    ? '你是增强规划器。用户要求详细规划。返回 JSON：{"steps":["..."],"complexity":"low|medium|high","dependencies":["..."],"risks":["..."],"estimatedEffort":"..."}'
-    : '你是任务规划器。只返回 JSON：{"steps":["..."],"complexity":"low|medium|high"}';
+    ? `你是增强规划器。将用户请求分解为可执行的 DAG 子任务。
+返回 JSON 格式：
+{
+  "steps": ["步骤1描述", "步骤2描述", ...],
+  "complexity": "low|medium|high",
+  "dependencies": [["步骤2依赖步骤1的说明"], ...],
+  "risks": ["风险说明"],
+  "estimatedEffort": "预估工作量",
+  "toolsNeeded": ["所需工具列表"]
+}`
+    : '你是任务规划器。返回 JSON：{"steps":["..."],"complexity":"low|medium|high"}';
 
   try {
     const raw = await plannerClient.generateText({
@@ -35,13 +50,48 @@ export async function buildExecutionPlan({
     });
     const payload = extractFirstJsonObject(raw);
     if (!payload || !Array.isArray(payload.steps) || !payload.steps.length) {
-      return '';
+      return null;
     }
-    return `执行计划:\n${payload.steps.map((step, index) => `${index + 1}. ${step}`).join('\n')}`;
+
+    return {
+      steps: payload.steps.map((desc, i) => ({
+        id: `step-${i + 1}`,
+        description: desc,
+        status: 'pending',
+      })),
+      complexity: payload.complexity || 'medium',
+      dependencies: payload.dependencies || [],
+      risks: payload.risks || [],
+      estimatedEffort: payload.estimatedEffort || '',
+      toolsNeeded: payload.toolsNeeded || [],
+    };
   } catch {
-    return '';
+    return null;
   }
 }
+
+export async function buildExecutionPlan({
+  plannerClient,
+  message,
+  workspaceOverview,
+  enabled = true
+}) {
+  const structured = await buildStructuredPlan({
+    plannerClient, message, workspaceOverview, enabled
+  });
+
+  if (!structured) return '';
+
+  let hint = `执行计划:\n${structured.steps.map((s, index) => `${index + 1}. ${s.description}`).join('\n')}`;
+
+  if (structured.toolsNeeded.length) {
+    hint += `\n所需工具: ${structured.toolsNeeded.join(', ')}`;
+  }
+
+  return hint;
+}
+
+// ─── 回答质检与修正 ───
 
 export async function reflectAndRevise({
   criticClient,
@@ -56,7 +106,7 @@ export async function reflectAndRevise({
   try {
     const raw = await criticClient.generateText({
       systemPrompt:
-        '你是回答质检器。只返回 JSON：{"needsRevision":true|false,"improvedReply":"...","issues":["..."]}',
+        '你是回答质检器。返回 JSON：{"needsRevision":true|false,"improvedReply":"...","issues":["..."]}',
       messages: [
         {
           role: 'user',

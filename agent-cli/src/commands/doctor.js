@@ -45,6 +45,14 @@ export async function runDoctorCommand(options) {
   console.log(`- summarize after messages: ${runtime.config.conversation?.summarizeAfterMessages}`);
   console.log(`- context token budget: ${runtime.config.conversation?.maxRecentContextTokens}`);
 
+  // System integration
+  const sysInt = runtime.config.systemIntegration || {};
+  console.log('\nSystem integration:');
+  console.log(`- computer control: ${sysInt.computerControl !== false}`);
+  console.log(`- shell execution: ${sysInt.shellExecution !== false}`);
+  console.log(`- tools enabled in chat: ${runtime.config.tools?.enabledInChat !== false}`);
+  console.log(`- web search: ${runtime.config.tools?.webSearch?.enabled !== false}`);
+
   // MCP diagnostics
   const mcpServers = runtime.config.mcpServers || {};
   const mcpNames = Object.keys(mcpServers);

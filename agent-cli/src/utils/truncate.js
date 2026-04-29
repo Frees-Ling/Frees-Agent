@@ -1,5 +1,7 @@
-const CJK_RE = /[ᄀ-ᅟ⺀-꓏가-힯豈-﫿︐-︙︰-﹯！-｠￠-￦]/;
-const WIDE_RE = /[\u{1F000}-\u{1F9FF}\u{20000}-\u{2FA1F}]/u;
+// Full-width / CJK characters — covers CJK Unified Ideographs, Extensions A–H,
+// Kangxi Radicals, CJK Compatibility Ideographs Supplement, full-width symbols,
+// half-width Hangul, and wide Emoji.
+const WIDE_RE = /[\u{1100}-\u{115F}\u{2E80}-\u{2FFF}\u{3000}-\u{303F}\u{3040}-\u{309F}\u{30A0}-\u{30FF}\u{3100}-\u{312F}\u{3130}-\u{318F}\u{3190}-\u{31FF}\u{3200}-\u{33FF}\u{3400}-\u{4DBF}\u{4E00}-\u{9FFF}\u{A000}-\u{A4CF}\u{AC00}-\u{D7AF}\u{F900}-\u{FAFF}\u{FE10}-\u{FE19}\u{FE30}-\u{FE6F}\u{FF01}-\u{FF60}\u{FFE0}-\u{FFE6}\u{1B000}-\u{1B0FF}\u{1B100}-\u{1B12F}\u{1F000}-\u{1F9FF}\u{20000}-\u{2FFFF}\u{30000}-\u{3FFFF}]/u;
 
 let segmenter = null;
 function getSegmenter() {
@@ -19,7 +21,7 @@ export function stringWidth(str) {
       continue;
     }
     const char = str[i];
-    if (CJK_RE.test(char) || WIDE_RE.test(char)) {
+    if (WIDE_RE.test(char)) {
       width += 2;
     } else {
       width += 1;

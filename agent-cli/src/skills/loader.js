@@ -94,13 +94,22 @@ export async function loadSkills(workspaceRoot) {
       continue;
     }
     seenSlugs.add(slug);
+    const rawAllowed = frontmatter['allowed-tools'] || '';
+    const rawBlocked = frontmatter['blocked-tools'] || '';
+    const parseToolList = (str) => String(str || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
     skills.push({
       name,
       slug,
       description,
       content: raw,
       path: filePath,
-      allowedTools: frontmatter['allowed-tools'] || ''
+      version: frontmatter.version || '1.0',
+      allowedTools: parseToolList(rawAllowed),
+      blockedTools: parseToolList(rawBlocked),
+      triggers: parseToolList(frontmatter.triggers || ''),
+      priority: parseInt(frontmatter.priority || '0', 10) || 0,
+      models: parseToolList(frontmatter.models || ''),
     });
   }
 
@@ -114,6 +123,17 @@ export function selectRelevantSkills(skills, request, limit = 3) {
   for (const skill of skills) {
     let score = 0;
     const haystack = `${skill.name} ${skill.slug} ${skill.description}`.toLowerCase();
+
+    // Score from trigger keywords (highest weight)
+    if (Array.isArray(skill.triggers)) {
+      for (const trigger of skill.triggers) {
+        if (request.toLowerCase().includes(trigger.toLowerCase())) {
+          score += 10;
+        }
+      }
+    }
+
+    // Score from name/slug/description
     for (const token of requestTokens) {
       if (haystack.includes(token)) {
         score += 4;
@@ -122,6 +142,10 @@ export function selectRelevantSkills(skills, request, limit = 3) {
         score += 1;
       }
     }
+
+    // Add priority as a base score bonus
+    score += skill.priority || 0;
+
     if (score > 0) {
       scored.push({ skill, score });
     }

@@ -1,49 +1,170 @@
-// Frees Agent 桌宠系统 — 可爱的终端伴侣
+// Frees-Agent 桌宠系统 — 可爱的终端伴侣
 // 6 物种 + 3 帧动画 + 对话气泡 + 情绪反应
 
-const SPECIES = {
-  cat: { name: '小猫', color: '\x1b[38;2;255;165;0m' },
-  penguin: { name: '企鹅', color: '\x1b[38;2;0;150;255m' },
-  rabbit: { name: '兔兔', color: '\x1b[38;2;255;192;203m' },
-  ghost: { name: '幽灵', color: '\x1b[38;2;180;140;255m' },
-  dragon: { name: '小龙', color: '\x1b[38;2;50;205;100m' },
-  owl: { name: '猫头鹰', color: '\x1b[38;2;210;150;80m' },
-};
+import { stringWidth } from '../utils/truncate.js';
 
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
 
+const SPECIES = {
+  cat: { name: '小猫', color: '\x1b[38;2;255;165;0m' },    // 橙
+  penguin: { name: '企鹅', color: '\x1b[38;2;0;150;255m' }, // 蓝
+  rabbit: { name: '兔兔', color: '\x1b[38;2;255;192;203m' },// 粉
+  ghost: { name: '幽灵', color: '\x1b[38;2;180;140;255m' }, // 紫
+  dragon: { name: '小龙', color: '\x1b[38;2;50;205;100m' }, // 绿
+  owl: { name: '猫头鹰', color: '\x1b[38;2;210;150;80m' },  // 棕
+};
+
 const SPRITES = {
+  // ── 小猫 ──
   cat: [
-    ['  ╭─────╮  ', ' ╱  ●  ●  ╲ ', ' │   ω    │ ', ' ╲   ╻   ╱  ', '  ╰───╯──╯  '],
-    ['  ╭─────╮  ', ' ╱  ●  ●  ╲ ', ' │   ω    │ ', ' ╲  ╱╲   ╱  ', '  ╰─╯  ╰─╯  '],
-    ['  ╭─────╮  ', ' ╱  ●  ◕  ╲ ', ' │   ω    │ ', ' ╲   ╻   ╱  ', '  ╰───╯──╯  '],
+    // Frame 0: 正常
+    [
+      '  ╭────────╮  ',  // 14
+      ' ╱  ^_^     ╲ ',  // 14
+      ' │   ω      │ ',  // 14
+      ' ╰──────────╯ ',  // 14
+    ],
+    // Frame 1: 眨眼
+    [
+      '  ╭────────╮  ',
+      ' ╱  -_-     ╲ ',
+      ' │   ω      │ ',
+      ' ╰──────────╯ ',
+    ],
+    // Frame 2: 惊讶
+    [
+      '  ╭────────╮  ',
+      ' ╱  >_<     ╲ ',
+      ' │   ω      │ ',
+      ' ╰──────────╯ ',
+    ],
   ],
+
+  // ── 企鹅 ──
   penguin: [
-    ['  ╭────╮   ', ' ╱  ●  ●  ╲ ', ' │   ><   │ ', ' ╲  ╭──╮ ╱  ', '  ╰─╯  ╰─╯  '],
-    ['  ╭────╮   ', ' ╱  ●  ●  ╲ ', ' │   ><   │ ', ' │  ╭──╮  │ ', '  ╰─╯  ╰─╯  '],
-    ['  ╭────╮   ', ' ╱  ●  ●  ╲ ', ' │  ──><─ │ ', ' ╲  ╭──╮ ╱  ', '  ╰─╯  ╰─╯  '],
+    // Frame 0: 正常
+    [
+      '  ╭────────╮  ',
+      ' │  \'‿\'     │ ',
+      ' │   ><     │ ',
+      ' ╰──────────╯ ',
+    ],
+    // Frame 1: 眨眼
+    [
+      '  ╭────────╮  ',
+      ' │  -_-     │ ',
+      ' │   ><     │ ',
+      ' ╰──────────╯ ',
+    ],
+    // Frame 2: 张嘴
+    [
+      '  ╭────────╮  ',
+      ' │  \'v\'     │ ',
+      ' │   ><     │ ',
+      ' ╰──────────╯ ',
+    ],
   ],
+
+  // ── 兔兔 ──
   rabbit: [
-    [' ╭───────╮ ', ' │ ●    ● │ ', ' │   ..   │ ', ' ╰──╭──╮──╯ ', '    ╰──╯   '],
-    [' ╭───────╮ ', ' │ ●    ● │ ', ' │   ..   │ ', ' ╰──╭──╮──╯ ', '   ╱╰──╯╲  '],
-    [' ╭───────╮ ', ' │ ◕    ● │ ', ' │  ~..   │ ', ' ╰──╭──╮──╯ ', '    ╰──╯   '],
+    // Frame 0: 正常
+    [
+      ' ╭┃────────┃╮ ',
+      ' │  ◕‿◕     │ ',
+      ' │   ω      │ ',
+      ' ╰──────────╯ ',
+    ],
+    // Frame 1: 眨眼
+    [
+      ' ╭┃────────┃╮ ',
+      ' │  u_u     │ ',
+      ' │   ω      │ ',
+      ' ╰──────────╯ ',
+    ],
+    // Frame 2: 开心
+    [
+      ' ╭┃────────┃╮ ',
+      ' │  ◕‿◕     │ ',
+      ' │  ~ω~     │ ',
+      ' ╰──────────╯ ',
+    ],
   ],
+
+  // ── 幽灵 ──
   ghost: [
-    ['  ╭─────╮  ', ' ╱  ●  ●  ╲ ', ' │        │ ', ' ╲  ╭──╮ ╱  ', '  ╰─╯  ╰─╯  '],
-    ['  ╭─────╮  ', ' ╱  ◕  ◕  ╲ ', ' │        │ ', ' ╲  ╭──╮ ╱  ', '  ╰─╯  ╰─╯  '],
-    ['  ╭─────╮  ', ' ╱  ●  ●  ╲ ', ' │   ~~   │ ', ' ╲  ╭──╮ ╱  ', '  ╰─╯  ╰─╯  '],
+    // Frame 0: 正常
+    [
+      ' ╭──────────╮ ',
+      ' │  ◕‿◕     │ ',
+      ' │   ~~     │ ',
+      ' ╰─╯─╰─╯─╰──╯ ',
+    ],
+    // Frame 1: 吓人
+    [
+      ' ╭──────────╮ ',
+      ' │  >_<     │ ',
+      ' │   ~~     │ ',
+      ' ╰─╯─╰─╯─╰──╯ ',
+    ],
+    // Frame 2: 卖萌
+    [
+      ' ╭──────────╮ ',
+      ' │  ◕o◕     │ ',
+      ' │  ────    │ ',
+      ' ╰─╯─╰─╯─╰──╯ ',
+    ],
   ],
+
+  // ── 小龙 ──
   dragon: [
-    ['  ╭──────╮ ', ' ╱  ●  ●  ╲ ', ' │   ~~   │ ', ' ╰──╭──╮──╯ ', '   ╱╰──╯╲  '],
-    ['  ╭──────╮ ', ' ╱  ●  ●  ╲ ', ' │  ──~~─ │ ', ' ╰──╭──╮──╯ ', '   ╱╰──╯╲  '],
-    ['  ╭──────╮ ', ' ╱  ●  ◕  ╲ ', ' │  ──~~─ │ ', ' ╰──╭──╮──╯ ', '   ╱  ╲╲  '],
+    // Frame 0: 正常
+    [
+      ' ╱╲────────╱╲ ',
+      ' │  ^_^     │ ',
+      ' │   ω      │ ',
+      ' ╰──────────╯ ',
+    ],
+    // Frame 1: 眨眼
+    [
+      ' ╱╲────────╱╲ ',
+      ' │  -_-     │ ',
+      ' │   ω      │ ',
+      ' ╰──────────╯ ',
+    ],
+    // Frame 2: 喷火
+    [
+      ' ╱╲────────╱╲ ',
+      ' │  ^_^     │ ',
+      ' │  >ω<     │ ',
+      ' ╰──────────╯ ',
+    ],
   ],
+
+  // ── 猫头鹰 ──
   owl: [
-    ['  ╭─────╮  ', ' ╱ ●   ● ╲ ', ' │   O    │ ', ' ╲  ╭──╮ ╱  ', '  ╰─╯  ╰─╯  '],
-    ['  ╭─────╮  ', ' ╱ ●   ● ╲ ', ' │  _O_   │ ', ' ╲  ╭──╮ ╱  ', '  ╰─╯  ╰─╯  '],
-    ['  ╭─────╮  ', ' ╱ ●   ─ ╲ ', ' │   O    │ ', ' ╲  ╭──╮ ╱  ', '  ╰─╯  ╰─╯  '],
+    // Frame 0: 正常
+    [
+      ' ╭╮────────╭╮ ',
+      ' │ ●  ●     │ ',
+      ' │   O      │ ',
+      ' ╰──────────╯ ',
+    ],
+    // Frame 1: 眨眼
+    [
+      ' ╭╮────────╭╮ ',
+      ' │ ●  ─     │ ',
+      ' │   O      │ ',
+      ' ╰──────────╯ ',
+    ],
+    // Frame 2: 歪头
+    [
+      ' ╭╮────────╭╮ ',
+      ' │  ● ●     │ ',
+      ' │  _O_     │ ',
+      ' ╰──────────╯ ',
+    ],
   ],
 };
 
@@ -51,10 +172,10 @@ function createBubble(text, { maxWidth = 30 } = {}) {
   const lines = [];
   const words = String(text || '').split(' ');
   let currentLine = '';
-
   for (const word of words) {
-    if ((currentLine + ' ' + word).trim().length <= maxWidth) {
-      currentLine = (currentLine + ' ' + word).trim();
+    const candidate = currentLine ? currentLine + ' ' + word : word;
+    if (stringWidth(candidate) <= maxWidth) {
+      currentLine = candidate;
     } else {
       if (currentLine) lines.push(currentLine);
       currentLine = word;
@@ -63,13 +184,15 @@ function createBubble(text, { maxWidth = 30 } = {}) {
   if (currentLine) lines.push(currentLine);
   if (!lines.length) lines.push('...');
 
-  const width = Math.max(...lines.map(l => l.length));
+  const widths = lines.map(l => stringWidth(l));
+  const max = Math.max(...widths);
   const bubble = [];
-  bubble.push(` ╭${'─'.repeat(width + 2)}╮ `);
+  bubble.push(` ╭${'─'.repeat(max + 2)}╮ `);
   for (const line of lines) {
-    bubble.push(` │ ${line.padEnd(width)} │ `);
+    const pad = max - stringWidth(line);
+    bubble.push(` │ ${line}${' '.repeat(pad)} │ `);
   }
-  bubble.push(` ╰${'─'.repeat(width + 2)}╯ `);
+  bubble.push(` ╰${'─'.repeat(max + 2)}╯ `);
   return bubble;
 }
 
@@ -123,7 +246,6 @@ export class Mascot {
     return result.join('\n');
   }
 
-  // 单行表情（用于对话中 inline 显示）
   renderInline() {
     const face = this.sprites[0][1];
     return `${this.color}${face.trim()}${RESET}`;
@@ -131,12 +253,12 @@ export class Mascot {
 
   getGreeting(userName) {
     const greetings = {
-      cat: ['喵~ 你好呀', '让你久等啦 喵', '有什么需要帮忙的吗'],
-      penguin: ['你好！', '嗨嗨~', '今天想做什么呢'],
-      rabbit: ['嗨哟~', '你好呀', '兔兔来啦~'],
+      cat: ['你好 喵~', '久等啦~', '需要帮忙？'],
+      penguin: ['你好！', '嗨嗨~', '做什么呢？'],
+      rabbit: ['嗨哟~', '你好呀', '兔兔来了~'],
       ghost: ['嗨~', '你好...', '我飘来了'],
-      dragon: ['你好！', '来了来了', '有任务吗~'],
-      owl: ['你好', '咕咕~', '今天要做什么呢'],
+      dragon: ['你好！', '来了来了', '有任务？'],
+      owl: ['你好', '咕咕~', '做什么呢？'],
     };
     const list = greetings[this.species] || greetings.cat;
     const greeting = list[Math.floor(Math.random() * list.length)];
@@ -145,12 +267,8 @@ export class Mascot {
 
   getThinkingReaction() {
     const map = {
-      cat: '让我想想... 喵',
-      penguin: '嗯... 让我想想',
-      rabbit: '兔兔正在思考...',
-      ghost: '让我想想...',
-      dragon: '思考中...',
-      owl: '咕... 让我想想',
+      cat: '让我想想... 喵', penguin: '嗯... 让我想想', rabbit: '兔兔正在思考...',
+      ghost: '让我想想...', dragon: '思考中...', owl: '咕... 让我想想',
     };
     return `${this.color}●${RESET} ${map[this.species] || '思考中...'}`;
   }
@@ -218,7 +336,6 @@ const COLOR = {
 
 export function c(text, colorCode) { return `${colorCode}${text}${RESET}`; }
 
-// 用户消息格式化 — 带 icon 和边距
 export function formatUserMessage(text) {
   const icon = `${COLOR.bgBlue}${COLOR.white} 你 ${RESET}`;
   const prefix = `${COLOR.cyan}┃${RESET} `;
@@ -227,11 +344,9 @@ export function formatUserMessage(text) {
   return ['', icon, body, ''].join('\n');
 }
 
-// 助手消息格式化 — 带桌宠颜色
 export function formatAssistantMessage(text, mascot) {
   const lines = String(text || '').split('\n');
   const formatted = lines.map(line => ` ${line}`).join('\n');
-
   if (mascot) {
     const header = `${mascot.color}${mascot.displayName}${RESET} ${DIM}${mascot.species}${RESET}`;
     return ['', header, `${COLOR.green}${formatted}${RESET}`, ''].join('\n');
@@ -239,34 +354,18 @@ export function formatAssistantMessage(text, mascot) {
   return ['', `${COLOR.green}╱╱ 助手${RESET}`, `${COLOR.green}${formatted}${RESET}`, ''].join('\n');
 }
 
-// 格式化思考中提示
 export function formatThinking() {
   const spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   let i = 0;
   return {
-    frame: () => {
-      const f = spinner[i];
-      i = (i + 1) % spinner.length;
-      return `${COLOR.yellow}${f}${RESET}`;
-    },
+    frame: () => { const f = spinner[i]; i = (i + 1) % spinner.length; return `${COLOR.yellow}${f}${RESET}`; },
     start: () => { i = 0; },
   };
 }
 
-// 错误消息格式化
-export function formatError(text) {
-  return `${COLOR.red}✗${RESET} ${COLOR.red}${text}${RESET}`;
-}
-
-// 成功消息格式化
-export function formatSuccess(text) {
-  return `${COLOR.green}✓${RESET} ${COLOR.green}${text}${RESET}`;
-}
-
-// 提示消息格式化
-export function formatHint(text) {
-  return `${DIM}${COLOR.white}${text}${RESET}`;
-}
+export function formatError(text) { return `${COLOR.red}✗${RESET} ${COLOR.red}${text}${RESET}`; }
+export function formatSuccess(text) { return `${COLOR.green}✓${RESET} ${COLOR.green}${text}${RESET}`; }
+export function formatHint(text) { return `${DIM}${COLOR.white}${text}${RESET}`; }
 
 export { COLOR as colors, SPECIES, selectSpecies, createBubble };
 

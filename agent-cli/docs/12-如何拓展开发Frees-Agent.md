@@ -41,6 +41,39 @@ export async function runMyCommand(options) {
 
 在 `README` 和 `docs/` 里补使用说明。
 
+## 3.5 如何增加一个新工具
+
+工具箱（toolbox）实现在 `src/agent/tools.js`，分三步注册新工具：
+
+### 第一步：实现工具逻辑
+
+在 `src/agent/tools.js` 的 `runTool` 函数中添加 `case`：
+
+```js
+case 'my_new_tool': {
+  const param = String(args.param || '').trim();
+  if (!param) throw new Error('my_new_tool 需要 param');
+  const data = await doSomething(param);
+  return { ok: true, data };
+}
+```
+
+### 第二步：注册工具描述
+
+在 `getToolList` 函数中添加工具描述：
+
+```js
+{ name: 'my_new_tool', description: 'What this tool does' },
+```
+
+### 第三步：在提示词中暴露
+
+在 `src/agent/prompts.js` 的 `CHAT_TOOL_SYSTEM_PROMPT` 或 `TOOL_DESCRIPTIONS` 中添加用法说明，让模型知道工具的存在。
+
+### 第四步（可选）：MCP 工具
+
+如果你的工具需要外部服务，考虑封装为 MCP 服务器，通过 `mcpServers` 配置注入。<code>mcpHandlers</code> 会自动把 MCP 工具合并到工具箱中。
+
 ## 3. 如何增加一个新的模型 provider
 
 ### 第一步

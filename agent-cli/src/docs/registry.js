@@ -104,6 +104,26 @@ export const DOCS = [
     slug: 'feature-config',
     title: '自动联网与新功能配置指南',
     filename: '19-自动联网与新功能配置指南.md'
+  },
+  {
+    slug: 'roadmap',
+    title: '不足之处与改进计划',
+    filename: '20-不足之处与改进计划.md'
+  },
+  {
+    slug: 'autonomous-agent',
+    title: '自主 Agent 能力架构',
+    filename: '21-自主Agent能力架构.md'
+  },
+  {
+    slug: 'mcp-templates',
+    title: 'MCP 工具配置模板',
+    filename: '22-MCP工具配置模板.md'
+  },
+  {
+    slug: 'api-reference',
+    title: 'API 参考文档',
+    filename: '23-API参考文档.md'
   }
 ];
 

@@ -40,6 +40,20 @@
 - 向量记忆：根据当前 query 检索 topK 语义相关片段注入
 - 会话摘要：超过阈值自动压缩，避免上下文膨胀
 
+## Vector Search API
+
+向量搜索实现在 `src/memory/vector.js`，采用纯内存方案（无需外部向量数据库）：
+
+- **分词（tokenize）**：CJK 字符逐字保留，非 CJK 文本按 Unicode 属性分词，同时生成 2-4 n-gram 提升部分匹配能力
+- **嵌入（embedText）**：基于 FNV-1a 哈希将每个 token 映射到 256 维向量槽位，累加后 L2 归一化
+- **检索（queryVectorMemories）**：余弦相似度排序，过滤 score ≤ 0.06 的低质量结果，返回 topK
+- **索引持久化**：`memory/vector-memories.json`，上限 500 条，超限时淘汰最早条目
+
+核心 API：
+- `embedText(text)` → `number[]`：将文本转为 256 维向量
+- `queryVectorMemories(vectorPath, query, topK)` → `{id, category, content, score}[]`：检索最相似记忆
+- `upsertDurableMemoriesToVectorIndex(vectorPath, durableMemories)`：将持久化记忆同步到向量索引
+
 ## Token 管理
 
 - 默认 `maxOutputTokens=16000`

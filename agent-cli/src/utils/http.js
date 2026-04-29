@@ -27,7 +27,14 @@ async function request(url, { method = 'POST', headers = {}, body, timeoutMs = D
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`HTTP ${response.status}: ${errorText}`);
+    const status = response.status;
+    let advice = '';
+    if (status === 401) advice = ' 建议: 检查 API Key 是否正确配置。';
+    else if (status === 403) advice = ' 建议: API Key 权限不足，请检查账号权限。';
+    else if (status === 404) advice = ' 建议: API 端点地址错误，请检查 base-url 配置。';
+    else if (status === 429) advice = ' 建议: 请求频率过高，请稍后重试或降低并发。';
+    else if (status >= 500) advice = ' 建议: 服务端异常，请稍后重试。';
+    throw new Error(`HTTP ${status}: ${errorText.slice(0, 500)}${advice}`);
   }
 
   return response;

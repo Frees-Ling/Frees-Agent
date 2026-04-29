@@ -1,4 +1,32 @@
-.idea
+# IDE
+.idea/
+*.swp
+*.swo
+*~
 
-node_modules
-agent-cli/node_modules
+# Dependencies
+node_modules/
+
+# Claude AI
+.claude/
+
+# Frees-Agent local data
+.frees-agent/
+
+# Rust / Tauri build artifacts (large binaries)
+agent-cli/src-tauri/target/
+
+# Build outputs
+agent-cli/dist/
+agent-cli/release/
+
+# Environment / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -87,7 +87,7 @@ CLI 帮助信息已更新，支持：
 请先启动 `@tavily/mcp`：
 
 ```bash
-export TAVILY_API_KEY=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
+export TAVILY_API_KEY=YOUR_TAVILY_API_KEY
 npx @tavily/mcp
 ```
 
@@ -114,7 +114,7 @@ npx @tavily/mcp
       "command": "npx",
       "args": ["@tavily/mcp"],
       "env": {
-        "TAVILY_API_KEY": "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"
+        "TAVILY_API_KEY": "YOUR_TAVILY_API_KEY"
       },
       "baseUrl": "http://127.0.0.1:1234/v1"
     }

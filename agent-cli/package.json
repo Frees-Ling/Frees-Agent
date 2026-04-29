@@ -13,22 +13,41 @@
     "edit": "node ./bin/ai-agent.js edit",
     "complete": "node ./bin/ai-agent.js complete",
     "doctor": "node ./bin/ai-agent.js doctor",
-    "test": "node --test test/",
-    "build:bundle": "mkdir dist && npx esbuild ./src/cli.js --bundle --platform=node --target=node20 --outfile=dist/frees-agent.js && npx cpy \"docs/**/*\" dist/docs",    
+    "test": "node --test test/agent-cli.test.js",
+    "build:bundle": "mkdir dist && npx esbuild ./src/cli.js --bundle --platform=node --target=node20 --outfile=dist/frees-agent.js && npx cpy \"docs/**/*\" dist/docs",
     "build:exe": "npx pkg . --targets node18-win-x64 --output release/frees-agent.exe",
+    "build:tauri": "cd src-tauri && cargo build --release 2>&1 | tail -3",
+    "gui": "npm run build:tauri && echo '✓ Tauri 桌面应用已构建: src-tauri/target/release/frees-agent.exe'",
     "build": "npm run build:bundle && npm run build:exe"
   },
   "pkg": {
-  "scripts": ["bin/ai-agent.js"],
-  "assets": ["docs/**/*"],
-  "targets": ["node18-win-x64"]
-},
+    "scripts": [
+      "bin/ai-agent.js"
+    ],
+    "assets": [
+      "docs/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ]
+  },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1",
     "cpy-cli": "^7.0.0",
     "esbuild": "^0.19.0",
     "pkg": "^5.8.1"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.7.0",
+    "@tauri-apps/plugin-fs": "^2.5.0",
+    "@tauri-apps/plugin-notification": "^2.3.3",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-shell": "^2.3.5",
+    "express": "^5.2.1",
+    "ws": "^8.20.0"
   }
 }

@@ -2,7 +2,7 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { buildChatUserPrompt, CHAT_SYSTEM_PROMPT } from '../agent/prompts.js';
-import { buildExecutionPlan, reflectAndRevise } from '../agent/reasoning.js';
+import { buildExecutionPlan, buildStructuredPlan, reflectAndRevise } from '../agent/reasoning.js';
 import { runChatToolAgent } from '../agent/chat-tool-loop.js';
 import { createAgentToolbox } from '../agent/tools.js';
 import {
@@ -18,14 +18,15 @@ import { createModelClient, createRoleModelClient } from '../model/index.js';
 import { formatSkillContext, loadSkills, selectRelevantSkills } from '../skills/loader.js';
 import { searchWebWithTavily, shouldUseWebSearch } from '../tools/web-search.js';
 import { printFreesAgentBanner } from '../ui/banner.js';
-import { Mascot, formatUserMessage, formatAssistantMessage, formatError, formatSuccess, formatHint, c, colors } from '../ui/mascot.js';
-import { StatusBar, divider } from '../ui/status-bar.js';
-import { Spinner, ThinkingIndicator } from '../ui/progress.js';
+import { Mascot, formatError, formatSuccess, formatHint, colors } from '../ui/mascot.js';
+import { StatusLine, divider } from '../ui/status-bar.js';
+import { Spinner } from '../ui/progress.js';
 import { estimateMessagesTokens, estimateTokens } from '../utils/tokens.js';
 import { StreamBatcher } from '../utils/stream.js';
 import { runEditCommand } from './edit.js';
 import { buildWorkspaceOverview, findRelevantFiles, scanWorkspace } from '../workspace/indexer.js';
 import { McpManager } from '../tools/mcp-client.js';
+import { getTaskQueue } from './tasks.js';
 
 const EMPTY_REPLY_FALLBACK = '我刚才没有收到模型的有效输出，请重试一次。';
 
@@ -35,7 +36,11 @@ function shouldUseToolLoop(message) {
   const toolKeywords = [
     '修改', '重构', '创建文件', '读文件', '查看文件',
     'search', 'grep', 'read file', 'write file', 'replace',
-    'patch', 'apply', '目录', '代码改造'
+    'patch', 'apply', '目录', '代码改造',
+    '时间', '日期', '系统', '进程', '服务',
+    'time', 'date', 'system', 'process', '运行命令',
+    '执行', 'bash', 'shell', '终端', '命令行',
+    '排查', '诊断', 'debug', '日志', 'log',
   ];
   return toolKeywords.some(keyword => text.includes(keyword));
 }
@@ -104,7 +109,7 @@ export async function runChatCommand(options) {
   let workspaceOverview = '未指定工作区。';
   let availableSkills = [];
 
-  // ── 初始化：工作区扫描 ──
+  // 初始化：工作区扫描
   const initSpinner = new Spinner({ text: '扫描工作区...', style: 'dots' });
   initSpinner.start();
   index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
@@ -115,7 +120,7 @@ export async function runChatCommand(options) {
     console.log(formatSuccess(`已加载 ${availableSkills.length} 个 skill`));
   }
 
-  // ── MCP ──
+  // MCP
   const mcpManager = new McpManager({
     config: runtime.config,
     storageRoot: path.dirname(runtime.configPath)
@@ -125,7 +130,7 @@ export async function runChatCommand(options) {
     console.log(formatHint(`MCP 服务: ${mcpServerNames.join(', ')}`));
   }
 
-  // ── 记忆 ──
+  // 记忆
   const memoryStore = await createMemoryStore({
     configPath: runtime.configPath,
     workspaceRoot,
@@ -135,23 +140,15 @@ export async function runChatCommand(options) {
 
   let plannerClient = null;
   let criticClient = null;
-  try {
-    plannerClient = (await createRoleModelClient(options, 'planner')).client;
-  } catch { plannerClient = client; }
-  try {
-    criticClient = (await createRoleModelClient(options, 'critic')).client;
-  } catch { criticClient = client; }
+  try { plannerClient = (await createRoleModelClient(options, 'planner')).client; } catch { plannerClient = client; }
+  try { criticClient = (await createRoleModelClient(options, 'critic')).client; } catch { criticClient = client; }
 
-  // ── 桌宠 ──
+  // 桌宠
   const mascotSpecies = process.env.FREES_AGENT_MASCOT || 'cat';
   const mascot = new Mascot({ species: mascotSpecies });
 
-  // ── 状态栏 ──
-  const statusBar = new StatusBar({
-    modelName: runtime.model,
-    sessionName: memoryState.session.name,
-    mode: 'chat',
-  });
+  // 状态行（单行 \r 刷新，与 readline 兼容）
+  const statusLine = new StatusLine();
 
   if (options.resetSession) {
     memoryState.session.summary = '';
@@ -160,7 +157,7 @@ export async function runChatCommand(options) {
     await saveMemoryState(memoryState);
   }
 
-  // ── 核心对话函数 ──
+  // ─── 核心对话函数 ───
   async function askModel(message) {
     const shortcutReply = resolveLocalChatShortcut(message, memoryState);
     if (shortcutReply) {
@@ -171,28 +168,33 @@ export async function runChatCommand(options) {
       return { reply: shortcutReply, streamed: false };
     }
 
-    statusBar.update({ statusText: `${mascot.renderInline()} 准备中...` });
-    statusBar.show();
+    // 显示状态行
+    statusLine.show(`${mascot.renderInline()} 准备中...`);
 
     const relevantFiles = index ? findRelevantFiles(index, message) : [];
-    await attachSemanticMemoriesToState({
-      state: memoryState, query: message, config: runtime.config
-    });
+    await attachSemanticMemoriesToState({ state: memoryState, query: message, config: runtime.config });
 
-    const relevantSkills = availableSkills.length
-      ? selectRelevantSkills(availableSkills, message) : [];
+    const relevantSkills = availableSkills.length ? selectRelevantSkills(availableSkills, message) : [];
 
-    statusBar.update({ statusText: `${mascot.renderInline()} 生成策略...` });
+    statusLine.update(`${mascot.renderInline()} 生成策略...`);
     const planningHint = await buildExecutionPlan({
       plannerClient, message, workspaceOverview,
       enabled: runtime.config.conversation?.planningEnabled !== false
     });
+    const structuredPlan = await buildStructuredPlan({
+      plannerClient, message, workspaceOverview,
+      enabled: runtime.config.conversation?.planningEnabled !== false
+    });
+    const planSteps = structuredPlan?.steps?.map(s => ({
+      id: s.id,
+      description: s.description,
+      status: 'pending',
+    })) || [];
 
+    // 联网搜索 — 任意 provider 都可触发
     let webHint = '';
-    if (runtime.config.tools?.webSearch?.enabled !== false &&
-        shouldUseWebSearch(message) &&
-        ['ollama', 'openai-compatible', 'mcp'].includes(runtime.providerName)) {
-      statusBar.update({ statusText: `${mascot.renderInline()} 联网检索...` });
+    if (runtime.config.tools?.webSearch?.enabled !== false && shouldUseWebSearch(message)) {
+      statusLine.update(`${mascot.renderInline()} 联网检索...`);
       try {
         const web = await searchWebWithTavily(message, runtime.config, {
           maxResults: runtime.config.tools?.webSearch?.maxResults ?? 5
@@ -255,15 +257,11 @@ export async function runChatCommand(options) {
     let usedFallbackReply = false;
     const useChatTools = runtime.config.tools?.enabledInChat !== false && shouldUseToolLoop(message);
 
-    // 状态栏：显示思考中
-    statusBar.update({
-      statusText: `${mascot.renderInline()} ${mascot.getThinkingReaction()}`,
-      messageCount: memoryState.session.totalTurns || 0,
-      tokenCount: estimateTokens(message),
-    });
+    // 显示思考状态
+    statusLine.update(`${mascot.renderInline()} ${mascot.getThinkingReaction()}`);
 
     if (useChatTools && index) {
-      statusBar.update({ statusText: `${mascot.renderInline()} 使用工具中...` });
+      statusLine.update(`${mascot.renderInline()} 使用工具中...`);
       const toolbox = createAgentToolbox(index, { readOnly: true, config: runtime.config });
       if (mcpServerNames.length && toolbox.setMcpManager) {
         toolbox.setMcpManager(mcpManager);
@@ -274,11 +272,15 @@ export async function runChatCommand(options) {
         memoryHint: memoryState.session.summary || '',
         planningHint, webHint,
         temperature: options.temperature ?? 0.1,
-        maxOutputTokens: options.maxOutputTokens ?? runtime.config.conversation?.maxOutputTokens ?? 16000
+        maxOutputTokens: options.maxOutputTokens ?? runtime.config.conversation?.maxOutputTokens ?? 16000,
+        planSteps,
+        onStepProgress: (current, total, status, desc) => {
+          statusLine.update(`${mascot.renderInline()} [${current}/${total}] ${desc}`);
+        }
       });
     } else if (streamResponses && typeof client.streamText === 'function') {
       streamed = true;
-      statusBar.hide();
+      statusLine.hide();
       console.log(`${colors.green}${mascot.displayName}${colors.reset} ${colors.dim}${mascot.species}${colors.reset}`);
       const batcher = new StreamBatcher({
         onFlush(chunk) { output.write(chunk); },
@@ -292,7 +294,7 @@ export async function runChatCommand(options) {
       batcher.end();
       if (String(reply || '').trim()) output.write('\n');
     } else {
-      statusBar.hide();
+      statusLine.hide();
       reply = await client.generateText(request);
     }
 
@@ -308,14 +310,13 @@ export async function runChatCommand(options) {
     }
 
     if (!streamed && runtime.config.conversation?.reflectionEnabled !== false && reply && !usedFallbackReply) {
-      statusBar.show();
-      statusBar.update({ statusText: `${mascot.renderInline()} ${mascot.getThinkingReaction()}` });
+      statusLine.show(`${mascot.renderInline()} ${mascot.getThinkingReaction()}`);
       reply = await reflectAndRevise({ criticClient, userMessage: message, draftReply: reply, enabled: true });
     }
 
     if (!streamed && runtime.config.conversation?.autoContinueOnCutoff !== false &&
         !usedFallbackReply && reply.length > 1000 && !/[。.!！?？]\s*$/.test(reply)) {
-      statusBar.update({ statusText: `${mascot.renderInline()} 继续生成...` });
+      statusLine.show(`${mascot.renderInline()} 继续生成...`);
       const continuation = await client.generateText({
         systemPrompt,
         messages: [
@@ -329,7 +330,7 @@ export async function runChatCommand(options) {
       if (continuation) reply = `${reply}\n${continuation}`;
     }
 
-    statusBar.hide();
+    statusLine.hide();
 
     await updateMemoryAfterTurn({
       client, state: memoryState, userMessage: message,
@@ -340,7 +341,7 @@ export async function runChatCommand(options) {
     return { reply, streamed };
   }
 
-  // ── 单次消息模式 ──
+  // ─── 单次消息模式 ───
   if (options.message) {
     try {
       const result = await askModel(options.message);
@@ -352,7 +353,7 @@ export async function runChatCommand(options) {
     return;
   }
 
-  // ── REPL 循环 ──
+  // ─── REPL 循环 ───
   const rl = readline.createInterface({ input, output });
 
   console.log(divider());
@@ -366,29 +367,23 @@ export async function runChatCommand(options) {
       const line = (await rl.question(`${colors.cyan}╱╱ 你${colors.reset} `)).trim();
       if (!line) continue;
 
-      // ── 命令处理 ──
       if (line === '/exit' || line === '/quit') break;
 
       if (line === '/help') {
         console.log(`${colors.cyan}╱╱ Frees Agent 帮助${colors.reset}`);
         const cmds = [
-          ['/help', '查看帮助'],
-          ['/exit', '退出聊天'],
-          ['/reload', '重新扫描工作区'],
-          ['/edit ...', '在当前工作区执行代码 Agent'],
-          ['/memory', '查看当前持久化记忆'],
-          ['/profile', '查看当前用户画像'],
-          ['/summary', '查看长对话摘要'],
-          ['/tasks', '查看任务记忆'],
-          ['/skills', '查看当前加载的 skill 文件'],
-          ['/stream on', '开启实时流式输出'],
-          ['/stream off', '关闭实时流式输出'],
-          ['/mascot', '查看或切换桌宠'],
-          ['/mascot <name>', '切换到指定桌宠'],
-          ['/status', '查看当前状态'],
+          ['/help', '查看帮助'], ['/exit', '退出聊天'],
+          ['/reload', '重新扫描工作区'], ['/edit ...', '执行代码 Agent'],
+          ['/memory', '查看持久化记忆'], ['/profile', '查看用户画像'],
+          ['/summary', '查看对话摘要'], ['/tasks', '查看任务记忆'],
+          ['/bg', '查看后台任务队列'],
+          ['/bg cancel <id>', '取消后台任务'],
+          ['/skills', '查看 skill 文件'],
+          ['/stream on/off', '流式输出开关'],
+          ['/mascot', '查看/切换桌宠'], ['/status', '查看当前状态'],
         ];
         for (const [cmd, desc] of cmds) {
-          console.log(`  ${colors.green}${cmd.padEnd(16)}${colors.reset} ${colors.dim}${desc}${colors.reset}`);
+          console.log(`  ${colors.green}${cmd.padEnd(18)}${colors.reset} ${colors.dim}${desc}${colors.reset}`);
         }
         continue;
       }
@@ -396,13 +391,13 @@ export async function runChatCommand(options) {
       if (line === '/mascot') {
         console.log(`${colors.cyan}╱╱ 当前桌宠: ${mascot.displayName} (${mascot.species})${colors.reset}`);
         console.log(mascot.renderWithBubble(`你好！我是${mascot.displayName}~`, { colored: true, frame: 0 }));
-        console.log(`${colors.dim}可用: cat, penguin, rabbit, ghost, dragon, owl${colors.reset}`);
-        console.log(`${colors.dim}设置环境变量 FREES_AGENT_MASCOT=<name> 永久切换${colors.reset}`);
+        console.log(`${colors.dim}可用: cat, penguin, rabbit, ghost, dragon, owl`);
+        console.log(`设置环境变量 FREES_AGENT_MASCOT=<name> 永久切换${colors.reset}`);
         continue;
       }
 
       if (line.startsWith('/mascot ')) {
-        const newSpecies = line.slice('/mascot '.length).trim().toLowerCase();
+        const newSpecies = line.slice(8).trim().toLowerCase();
         const validSpecies = ['cat', 'penguin', 'rabbit', 'ghost', 'dragon', 'owl'];
         if (validSpecies.includes(newSpecies)) {
           mascot.species = newSpecies;
@@ -418,40 +413,49 @@ export async function runChatCommand(options) {
         continue;
       }
 
-      if (line === '/memory') {
-        console.log(JSON.stringify(describeMemoryState(memoryState), null, 2));
-        continue;
-      }
-
-      if (line === '/profile') {
-        console.log(JSON.stringify(memoryState.profile, null, 2));
-        continue;
-      }
-
-      if (line === '/summary') {
-        console.log(memoryState.session.summary || '当前还没有长对话摘要。');
-        continue;
-      }
+      if (line === '/memory') { console.log(JSON.stringify(describeMemoryState(memoryState), null, 2)); continue; }
+      if (line === '/profile') { console.log(JSON.stringify(memoryState.profile, null, 2)); continue; }
+      if (line === '/summary') { console.log(memoryState.session.summary || '还没有对话摘要。'); continue; }
 
       if (line === '/tasks') {
-        if (!memoryState.tasks?.length) {
-          console.log('当前没有任务记忆。');
+        if (!memoryState.tasks?.length) { console.log('当前没有任务记忆。'); }
+        else { for (const t of memoryState.tasks.slice(0, 20)) console.log(`- [${t.status}] ${t.title}`); }
+        continue;
+      }
+
+      if (line === '/bg') {
+        const queue = getTaskQueue();
+        const { pending, running, completed } = queue.list();
+        console.log(`${colors.cyan}╱╱ 后台任务队列${colors.reset}`);
+        if (!pending.length && !running.length && !completed.length) {
+          console.log('  (空)');
         } else {
-          for (const task of memoryState.tasks.slice(0, 20)) {
-            console.log(`- [${task.status}] ${task.title}`);
+          if (running.length) {
+            console.log(`  ${colors.green}运行中:${colors.reset}`);
+            for (const t of running) console.log(`    ${t.id.slice(0, 16)}  ${t.name}`);
+          }
+          if (pending.length) {
+            console.log(`  ${colors.yellow}等待中:${colors.reset}`);
+            for (const t of pending) console.log(`    ${t.id.slice(0, 16)}  ${t.name}`);
+          }
+          if (completed.length) {
+            console.log(`  ${colors.dim}已完成: ${completed.length} 个${colors.reset}`);
           }
         }
+        continue;
+      }
+
+      if (line.startsWith('/bg cancel ')) {
+        const taskId = line.slice(11).trim();
+        if (!taskId) { console.log('用法: /bg cancel <taskId>'); continue; }
+        const ok = getTaskQueue().cancel(taskId);
+        console.log(ok ? formatSuccess(`已取消任务: ${taskId.slice(0, 16)}`) : formatError(`未找到任务: ${taskId.slice(0, 16)}`));
         continue;
       }
 
       if (line === '/skills') {
-        if (!availableSkills.length) {
-          console.log('当前工作区没有加载到 skill 文件。');
-        } else {
-          for (const skill of availableSkills) {
-            console.log(`- ${skill.slug}: ${skill.description}`);
-          }
-        }
+        if (!availableSkills.length) { console.log('当前工作区没有 skill 文件。'); }
+        else { for (const s of availableSkills) console.log(`- ${s.slug}: ${s.description}`); }
         continue;
       }
 
@@ -465,17 +469,8 @@ export async function runChatCommand(options) {
         continue;
       }
 
-      if (line === '/stream on') {
-        streamResponses = true;
-        console.log(formatSuccess('已开启实时流式输出'));
-        continue;
-      }
-
-      if (line === '/stream off') {
-        streamResponses = false;
-        console.log(formatHint('已关闭实时流式输出'));
-        continue;
-      }
+      if (line === '/stream on') { streamResponses = true; console.log(formatSuccess('已开启流式输出')); continue; }
+      if (line === '/stream off') { streamResponses = false; console.log(formatHint('已关闭流式输出')); continue; }
 
       if (line === '/status') {
         console.log(divider('状态'));
@@ -492,40 +487,32 @@ export async function runChatCommand(options) {
       }
 
       if (line.startsWith('/edit ')) {
-        if (!workspaceRoot) {
-          console.log('当前 chat 未绑定工作区，无法执行代码编辑。');
-          continue;
-        }
+        if (!workspaceRoot) { console.log('未绑定工作区，无法执行代码编辑。'); continue; }
         const spin = new Spinner({ text: '执行代码 Agent...', style: 'dots' });
         spin.start();
-        await runEditCommand({
-          ...options, workspace: workspaceRoot,
-          task: line.slice('/edit '.length)
-        });
+        await runEditCommand({ ...options, workspace: workspaceRoot, task: line.slice(6) });
         spin.stop('编辑 Agent 完成');
         index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
         workspaceOverview = buildWorkspaceOverview(index);
         continue;
       }
 
-      // ── 对话 ──
+      // 对话
       try {
         console.log(divider(mascot.displayName, { char: '─', color: 'green' }));
         const result = await askModel(line);
-        if (!result.streamed) {
-          console.log(`${result.reply}`);
-        }
+        if (!result.streamed) console.log(result.reply);
         console.log(divider());
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
         console.log(formatError(`${mascot.displayName} ${mascot.getConfusedReaction()}`));
         console.log(formatError(errMsg));
-        console.log(formatHint('你可以继续输入 /help、/reload，或者修复模型服务后直接继续聊天。'));
+        console.log(formatHint('输入 /help、/reload 或继续聊天'));
         console.log(divider());
       }
     }
   } finally {
-    statusBar.dispose();
+    statusLine.hide();
     rl.close();
   }
 }

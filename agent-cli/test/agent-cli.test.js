@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { runEditAgent } from '../src/agent/edit-loop.js';
 import { partitionTools, executeToolBatch, executeToolsSequential } from '../src/agent/orchestration.js';
 import { McpManager } from '../src/tools/mcp-client.js';
@@ -38,6 +38,37 @@ function createChunkStream(chunks) {
     }
   });
 }
+
+test('extractMultipleJsonObjects extracts parallel tool calls', async () => {
+  const { extractMultipleJsonObjects } = await import('../src/agent/chat-tool-loop.js');
+
+  // Single object
+  const single = extractMultipleJsonObjects('{"type":"tool","tool":"read_file","args":{"path":"a.txt"}}');
+  assert.equal(single.length, 1);
+  assert.equal(single[0].tool, 'read_file');
+
+  // Multiple objects in text
+  const multi = extractMultipleJsonObjects(
+    'First: {"type":"tool","tool":"read_file","args":{"path":"a.txt"}}\n\nThen: {"type":"tool","tool":"grep","args":{"query":"test"}}'
+  );
+  assert.equal(multi.length, 2);
+  assert.equal(multi[0].tool, 'read_file');
+  assert.equal(multi[1].tool, 'grep');
+
+  // Final action
+  const final = extractMultipleJsonObjects('{"type":"final","reply":"done"}');
+  assert.equal(final.length, 1);
+  assert.equal(final[0].type, 'final');
+  assert.equal(final[0].reply, 'done');
+
+  // Non-tool objects ignored
+  const ignored = extractMultipleJsonObjects('{"type":"other","data":"x"}');
+  assert.equal(ignored.length, 0);
+
+  // Empty
+  assert.equal(extractMultipleJsonObjects('').length, 0);
+  assert.equal(extractMultipleJsonObjects('no json here').length, 0);
+});
 
 test('extractFirstJsonObject reads fenced json', () => {
   const parsed = extractFirstJsonObject('```json\n{"type":"final","summary":"ok"}\n```');
@@ -638,7 +669,7 @@ test('Mascot renders specified species', () => {
   const mascot = new Mascot({ species: 'penguin' });
   assert.equal(mascot.species, 'penguin');
   const lines = mascot.render(0);
-  assert.equal(lines.length, 5);
+  assert.equal(lines.length, 4);
 });
 
 test('Mascot has greetings and reactions', () => {
@@ -802,6 +833,25 @@ test('stringWidth measures CJK and ASCII', async () => {
   assert.equal(stringWidth('\x1b[31mhello\x1b[0m'), 5);
   // Mixed
   assert.equal(stringWidth('a你b好c'), 7);
+});
+
+test('stringWidth handles extended CJK ranges', async () => {
+  const { stringWidth } = await import('../src/utils/truncate.js');
+
+  // Basic CJK
+  assert.equal(stringWidth('你好世界'), 8);
+  // CJK Extension A (U+3400-U+4DBF)
+  assert.equal(stringWidth('㐀㐁'), 4);
+  // Kangxi Radicals (U+2F00-U+2FDF)
+  assert.equal(stringWidth('⼀⼁'), 4);
+  // Hangul Jamo (U+1100-U+115F) — wide in terminals
+  assert.equal(stringWidth('ᄀᄁ'), 4);
+  // Katakana / Hiragana
+  assert.equal(stringWidth('カタカナ'), 8);
+  // Full-width symbols
+  assert.equal(stringWidth('！＠'), 4);
+  // Mixed
+  assert.equal(stringWidth('abc你好😀'), 9);
 });
 
 test('truncation functions handle edge cases', async () => {
@@ -1161,6 +1211,7 @@ test('agent toolbox includes new tools', async () => {
   assert.ok(names.includes('read_file'), 'should have read_file');
   assert.ok(names.includes('write_file'), 'should have write_file');
   assert.ok(names.includes('replace_in_file'), 'should have replace_in_file');
+  assert.ok(names.includes('system_info'), 'should have system_info');
 
   // Test aliases
   const result = await toolbox.runTool('glob', {});
@@ -1185,4 +1236,196 @@ test('agent toolbox bash tool validates commands', async () => {
   const result3 = await toolbox.runTool('bash', { command: 'echo ok', timeoutMs: 5000 });
   assert.ok(result3.ok, `expected ok, got: ${JSON.stringify(result3)}`);
   assert.ok(result3.data.stdout.includes('ok'));
+});
+
+
+// ---- System Info ----
+
+test('system-info getSystemInfo returns expected fields', async () => {
+  const { getSystemInfo, formatSystemInfo, injectSystemClock } = await import('../src/utils/system-info.js');
+
+  const info = getSystemInfo();
+  assert.ok(info.timestamp);
+  assert.ok(info.date);
+  assert.ok(info.time);
+  assert.ok(info.timezone);
+  assert.ok(info.platform);
+  assert.ok(info.osType);
+
+  const formatted = formatSystemInfo(info);
+  assert.ok(formatted.includes(info.platform));
+  assert.ok(formatted.includes(info.timezone));
+
+  const injected = injectSystemClock('base prompt');
+  assert.ok(injected.includes('base prompt'));
+  assert.ok(injected.includes(info.timezone));
+});
+
+test('agent toolbox system_info tool returns system data', async () => {
+  const { createAgentToolbox } = await import('../src/agent/tools.js');
+  const toolbox = createAgentToolbox({ root: '.', files: [] });
+  const result = await toolbox.runTool('system_info', {});
+  assert.ok(result.ok);
+  assert.ok(result.data.timestamp);
+  assert.ok(result.data.platform);
+});
+
+
+// ---- Plugin System ----
+
+test('plugin registry registers and executes plugins', async () => {
+  const { PluginRegistry, FreesAgentPlugin } = await import('../src/plugins/registry.js');
+  const registry = new PluginRegistry();
+
+  class TestPlugin extends FreesAgentPlugin {
+    constructor() { super('test'); }
+    async getSystemPromptExtra() { return 'Plugin extra context'; }
+    async getTools() { return [{name: 'test_tool', description: 'A test tool'}] }
+  }
+
+  registry.register(new TestPlugin());
+  assert.equal(registry.plugins.length, 1);
+  assert.ok((await registry.getSystemPromptExtra()).includes('Plugin extra context'));
+  const pluginTools = await registry.getTools();
+  assert.equal(pluginTools.length, 1);
+  assert.equal(pluginTools[0].name, 'test_tool');
+});
+
+test('plugin registry onMessage and onResponse pass through', async () => {
+  const { PluginRegistry, FreesAgentPlugin } = await import('../src/plugins/registry.js');
+  const registry = new PluginRegistry();
+  const result = await registry.runOnMessage('hello', {});
+  assert.equal(result, 'hello');
+});
+
+test('skill loader parses enhanced frontmatter', async () => {
+  const { loadSkills } = await import('../src/skills/loader.js');
+  const tmpDir = os.tmpdir();
+  const skillRoot = path.join(tmpDir, 'agent-cli-test-skills-' + Date.now());
+  await mkdir(path.join(skillRoot, '.claude', 'skills', 'my-skill'), { recursive: true });
+  await writeFile(path.join(skillRoot, '.claude', 'skills', 'my-skill', 'SKILL.md'),
+`---
+name: My Skill
+description: A custom skill
+allowed-tools: read_file, search_text
+blocked-tools: write_file, delete_file
+triggers: custom, special
+priority: 5
+---
+
+# My Skill
+This is a custom skill for testing.
+`);
+  const skills = await loadSkills(skillRoot);
+  const skill = skills.find(s => s.slug === 'my-skill');
+  assert.ok(skill);
+  assert.deepEqual(skill.allowedTools, ['read_file', 'search_text']);
+  assert.deepEqual(skill.blockedTools, ['write_file', 'delete_file']);
+  assert.deepEqual(skill.triggers, ['custom', 'special']);
+  assert.equal(skill.priority, 5);
+});
+
+// ---- Task Queue ----
+
+test('task queue enqueues and executes tasks', async () => {
+  const { TaskQueue } = await import('../src/tasks/queue.js');
+  const queue = new TaskQueue({ concurrency: 2 });
+
+  const results = [];
+  const t1 = queue.enqueue({
+    name: 'task1',
+    executor: async () => { results.push('t1'); return 'ok1'; }
+  });
+  const t2 = queue.enqueue({
+    name: 'task2',
+    executor: async ({ onProgress }) => {
+      onProgress(1, 3, 'step 1');
+      results.push('t2');
+      return 'ok2';
+    }
+  });
+
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  assert.equal(t1.status, 'completed');
+  assert.equal(t2.status, 'completed');
+  assert.equal(t1.result, 'ok1');
+  assert.deepEqual(results, ['t1', 't2']);
+});
+
+test('task queue enforces concurrency', async () => {
+  const { TaskQueue } = await import('../src/tasks/queue.js');
+  const queue = new TaskQueue({ concurrency: 1 });
+
+  let running = 0;
+  let maxRunning = 0;
+
+  const t1 = queue.enqueue({
+    name: 'slow1',
+    executor: async () => {
+      running++;
+      maxRunning = Math.max(maxRunning, running);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      running--;
+    }
+  });
+  const t2 = queue.enqueue({
+    name: 'slow2',
+    executor: async () => {
+      running++;
+      maxRunning = Math.max(maxRunning, running);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      running--;
+    }
+  });
+
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.equal(t1.status, 'completed');
+  assert.equal(t2.status, 'completed');
+  assert.equal(maxRunning, 1, 'should run at most 1 at a time');
+});
+
+test('task queue cancel removes pending task', async () => {
+  const { TaskQueue } = await import('../src/tasks/queue.js');
+  const queue = new TaskQueue({ concurrency: 1 });
+
+  const slow = new Promise(resolve => setTimeout(resolve, 100));
+  queue.enqueue({ name: 'blocker', executor: async () => { await slow; } });
+
+  const t2 = queue.enqueue({ name: 'cancel-me', executor: async () => 'done' });
+  assert.equal(t2.status, 'pending');
+
+  const ok = queue.cancel(t2.id);
+  assert.ok(ok);
+  assert.equal(t2.status, 'cancelled');
+});
+
+test('task queue stats report correctly', async () => {
+  const { TaskQueue } = await import('../src/tasks/queue.js');
+  const queue = new TaskQueue({ concurrency: 1 });
+
+  queue.enqueue({ name: 'a', executor: async () => { await new Promise(r => setTimeout(r, 50)); } });
+  queue.enqueue({ name: 'b', executor: async () => { await new Promise(r => setTimeout(r, 50)); } });
+
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const s = queue.stats;
+  assert.equal(s.completed, 2);
+  assert.equal(s.pending, 0);
+});
+
+test('task queue emits lifecycle events', async () => {
+  const { TaskQueue } = await import('../src/tasks/queue.js');
+  const queue = new TaskQueue({ concurrency: 1 });
+  const events = [];
+
+  queue.on('enqueued', t => events.push(`enq:${t.name}`));
+  queue.on('start', t => events.push(`start:${t.name}`));
+  queue.on('complete', t => events.push(`end:${t.name}`));
+
+  queue.enqueue({ name: 'evt', executor: async () => 'ok' });
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  assert.ok(events.includes('enq:evt'));
+  assert.ok(events.includes('start:evt'));
+  assert.ok(events.includes('end:evt'));
 });
