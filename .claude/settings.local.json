@@ -34,7 +34,8 @@
       "Bash(grep -E \"\\\\.\\(dll|exe|a\\)$\")",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(curl -s http://localhost:7780/api/status)"
     ]
   }
 }

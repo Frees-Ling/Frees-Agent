@@ -1,179 +1,613 @@
-# Frees Agent 文档区
+# Frees-Agent
 
-这里是 `Frees Agent` 的中文文档区，用来集中存放 AI 智能体、LLM 模型、训练、微调、模型加载、API 接入、记忆系统与超长对话等相关说明。
+**An intelligent, extensible AI Agent framework for the command line.**
 
-## 文档索引
+Frees-Agent is a production-ready AI Agent framework built on Node.js. It provides a rich CLI environment where large language models (LLMs) can autonomously reason, use tools, execute shell commands, edit files, search the web, and maintain long-term memory across sessions. The framework is designed to be modular, extensible, and deeply configurable -- suitable for both personal assistants and automated development workflows.
 
-- `01-什么是LLM模型与AI智能体.md`
-  什么是 LLM，什么是 AI Agent，它们之间的关系是什么。
-- `02-如何训练属于自己的LLM模型.md`
-  从零预训练、继续预训练、SFT、LoRA/QLoRA、RAG 等路线说明。
-- `03-LM-Studio模型二次训练.md`
-  如何看待 LM Studio 下载模型的再训练问题，什么能训，什么不能直接训。
-- `04-如何把模型训练到尽量稳定好用.md`
-  训练策略、数据质量、评测与上线策略。
-- `05-训练模型常见问题与解决方案.md`
-  欠拟合、过拟合、灾难性遗忘、显存不足、格式问题等。
-- `06-如何加载模型与接入自己的模型或云端API.md`
-  如何在 `Frees Agent` 里配置本地模型、OpenAI 兼容 API、Anthropic API，以及如何在代码里增加新的 provider。
-- `07-Frees-Agent记忆与超长对话.md`
-  `Frees Agent` 的长期记忆、用户画像、会话持久化和超长对话摘要压缩机制。
-- `08-数据集构建清洗标注与评测.md`
-  如何做数据集、清洗、标注和评测。
-- `09-模型应用产品化与落地路线图.md`
-  如何从模型走向产品和系统工程。
-- `10-系统权限电脑控制与安全边界.md`
-  电脑控制、系统权限、辅助功能、PowerShell 策略等说明。
-- `11-手把手把模型加载到Frees-Agent.md`
-  这是第一次上手最推荐看的文档，按步骤教你把模型接到 Frees Agent。
-- `12-如何拓展开发Frees-Agent.md`
-  面向后续开发者的扩展指南。
-- `13-项目架构说明.md`
-  项目目录和分层说明。
-- `14-Skill文件支持与编写说明.md`
-  Skill 文件支持、目录约定和编写方式。
-- `15-Frees-Agent项目源码逐文件逐函数剖析.md`
-  项目级源码分析、逐文件职责、逐函数职责、算法和优化方向。
-- `16-如何接入MCP外部工具.md`
-  如何将外部 MCP 工具与 `Frees Agent` 结合使用，并在配置中完成集成。
-- `17-快速项目式改造执行指南.md`
-  提供"先读 README、再做项目改造"的可复用高质量提示词模板。
-- `18-agent-memory-architecture.md`
-  统一长期记忆、向量记忆、任务记忆、跨设备合并与上下文压缩的架构说明。
-- `19-自动联网与新功能配置指南.md`
-  自动联网、模型自动回退、跨端 memory/sessions 合并、token 压缩等能力的配置说明。
-- `20-不足之处与改进计划.md`
-  当前版本已知不足、待优化项和长期改进路线图。
-- `21-自主Agent能力架构.md`
-  多模态能力、自主执行循环、工具矩阵扩展和自迭代机制的设计方案。
-- `22-MCP工具配置模板.md`
-  FFmpeg/Pillow/Puppeteer/PostgreSQL 等 MCP 服务器的配置模板，复制即用。
-- `23-API参考文档.md`
-  所有模块的导出函数和类清单，供二次开发参考。
+---
 
-## 推荐阅读顺序
+## Table of Contents
 
-1. 先读 LLM 与 Agent 基础
-2. 再读训练与微调路线
-3. 然后看模型加载与 API 接入
-4. 最后看 `Frees Agent` 的记忆与长对话实现
+1. [What is Frees-Agent](#what-is-frees-agent)
+2. [Features](#features)
+3. [Quick Start](#quick-start)
+4. [Architecture Overview](#architecture-overview)
+5. [Configuration Guide](#configuration-guide)
+6. [Development](#development)
+7. [Contributing](#contributing)
 
-## 在 CLI 中查看文档
+---
 
-你可以直接在终端里执行：
+## What is Frees-Agent
+
+Frees-Agent is not just another CLI chatbot. It is a full-featured **AI Agent framework** that enables LLMs to:
+
+- **Perceive** your filesystem, Git repositories, and workspace context
+- **Reason** about complex tasks and break them down into actionable steps
+- **Act** by executing shell commands, editing files, and calling external APIs
+- **Remember** user preferences, conversation history, and relevant facts across sessions
+- **Extend** with any MCP-compatible tool -- from databases to image processors to web browsers
+
+### How it works
+
+```
+You (user input)
+    │
+    ▼
+Frees-Agent CLI
+    │
+    ├──► Memory System (loads past context, user profile, vector memories)
+    │
+    ├──► Prompt Builder (constructs system prompt + tool descriptions)
+    │
+    ├──► LLM API Call (Anthropic, OpenAI, or local models)
+    │
+    ├──► Tool Execution Loop
+    │     ├── Read tools (parallel) ──► list_files, read_file, web_fetch, grep
+    │     └── Write tools (serial)  ──► write_file, edit, bash, MCP tools
+    │
+    └──► Memory System (saves new memories, updates vector index)
+```
+
+The AI model drives the loop autonomously: it decides which tools to call, in what order, and when the task is complete. You simply describe what you want done.
+
+### Use cases
+
+- **Code assistant**: Navigate, read, and edit large codebases with full context awareness
+- **DevOps automation**: Run deployment scripts, check logs, restart services
+- **Data analysis**: Query databases, process files, generate reports
+- **Personal assistant**: Remember your preferences, manage tasks, search the web
+- **Learning tool**: Explore technical documentation, experiment with code, ask questions about your projects
+
+---
+
+## Features
+
+### Intelligent tool orchestration
+
+Frees-Agent's core execution engine intelligently manages tool calls:
+
+- **Read/Write partitioning**: Read-only tools (file reads, searches) execute in parallel for maximum throughput; write tools (file edits, shell commands) execute serially to avoid conflicts
+- **Automatic retry**: API calls and tool executions retry on transient failures (up to 3 attempts)
+- **Result truncation**: Large tool outputs are automatically truncated to fit within the model's context window
+- **Message pruning**: When the conversation history exceeds the context limit, older messages are selectively pruned while preserving key context
+
+### Multi-layered memory system
+
+The memory architecture is designed for both short-term conversation coherence and long-term personalization:
+
+| Layer | Mechanism | Persistence | Purpose |
+|-------|-----------|-------------|---------|
+| **Conversation** | Message history | Session | Holds the current chat context |
+| **User profile** | Structured JSON | Cross-session | Remembers user name, preferences, goals |
+| **Key facts** | Extracted by LLM | Cross-session | Important information from conversations |
+| **Vector memory** | FNV-1a 256-dim embeddings | Cross-session | Semantic similarity search, CJK-aware |
+| **Task memory** | Hierarchical tasks | Cross-session | Tracks ongoing and completed tasks |
+
+Key capabilities:
+- **Deduplication**: Similar memories (word overlap >70%) are automatically merged
+- **Vector search**: Cosine similarity recall with a low threshold of 0.06
+- **Capacity limits**: Global maximum of 200 memories, 60 per category
+- **Cross-device sync**: Configure multiple `syncRoots` for automatic state merging
+- **Session compression**: Long conversations can be manually or automatically summarized
+
+### MCP (Model Context Protocol) integration
+
+Frees-Agent is a first-class MCP host, meaning it can connect to **any MCP-compatible server** as a plugin:
+
+- **File system servers**: Enhanced file operations, search, batch processing
+- **Database servers**: PostgreSQL, SQLite -- run queries, browse schemas
+- **Web tools**: Puppeteer (browser automation), Tavily/Brave Search (web search), fetch (content retrieval)
+- **Media processors**: FFmpeg (video/audio), Pillow (image manipulation)
+- **Version control**: Git repository management
+- **Developer tools**: Docker containers, GitHub API
+- **Knowledge tools**: Memory/knowledge graph servers
+
+See [22-MCP工具配置模板.md](./22-MCP工具配置模板.md) for complete configuration templates.
+
+### Security-first shell execution
+
+The shell execution subsystem (`src/shell/shell-exec.js`) implements defense-in-depth:
+
+- **7 dangerous command patterns** are statically blocked (rm -rf /, fork bombs, disk formatting, etc.)
+- **AbortController timeouts** prevent runaway processes
+- **Output caps** at 1MB prevent memory exhaustion
+- **Cross-platform shell detection** works on bash, zsh, cmd, and PowerShell
+
+### Rich CLI experience
+
+- **Themable ANSI output** with 4 built-in color schemes (dark/light/ANSI variants)
+- **Live status indicators**: Spinners, progress bars, and "thinking" animations
+- **Mascot display**: Optional CLI companion with dynamic expressions
+- **REPL-style chat loop** with multi-line input support
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- **Node.js** >= 18.0.0
+- **npm** >= 9.0.0
+- An API key for your chosen LLM provider (Anthropic Claude recommended)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/frees-agent.git
+cd frees-agent
+
+# Install dependencies
+npm install
+
+# Create your configuration file
+cp frees-agent.example.yaml frees-agent.yaml
+```
+
+### Configuration
+
+Edit `frees-agent.yaml` to set your LLM provider:
+
+```yaml
+model:
+  provider: anthropic      # Options: anthropic, openai, local
+  name: claude-sonnet-4-6  # Model name
+  apiKey: "${ANTHROPIC_API_KEY}"  # Use environment variable
+
+memory:
+  storeDir: "./memory"
+  enabled: true
+```
+
+Then set your API key as an environment variable:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxx
+```
+
+### Run
+
+```bash
+# Start an interactive chat session
+node src/cli.js chat
+
+# With a specific model
+node src/cli.js chat --model claude-sonnet-4-6
+
+# With verbose logging for debugging
+node src/cli.js chat --verbose
+
+# View built-in documentation
+node src/cli.js docs memory-long-chat
+```
+
+Once inside the chat session, try:
+
+```
+> What files are in the current directory?
+> Read the main configuration file and explain how it's structured.
+> Search for any TODO comments in the codebase.
+> What time is it in Tokyo right now? (if web search is enabled)
+```
+
+### First-time tips
+
+1. **Start simple**: Ask about your project structure. The agent will index your workspace.
+2. **Explore memory**: Ask "What do you know about me?" after a few exchanges to see memory extraction in action.
+3. **Try MCP tools**: Configure a simple MCP server (e.g., filesystem or git) and ask the agent to use it.
+4. **Monitor tokens**: Use `frees-agent cost --model <model-name>` to track API usage.
+
+---
+
+## Architecture Overview
+
+### Project structure
+
+```
+frees-agent/
+├── src/
+│   ├── cli.js                   # CLI entry point and command routing
+│   ├── commands/
+│   │   ├── chat.js              # Chat mode REPL loop
+│   │   └── ...                  # Other commands (docs, cost, compact)
+│   ├── agent/
+│   │   ├── chat-tool-loop.js    # Core tool-calling loop with retry + pruning
+│   │   ├── edit-loop.js         # Specialized loop for file editing tasks
+│   │   ├── orchestration.js     # Concurrent read + serial write tool execution
+│   │   ├── tools.js             # Unified tool registry with aliases
+│   │   ├── prompts.js           # System prompts and tool descriptions
+│   │   └── reasoning.js         # Execution planning and answer reflection
+│   ├── memory/
+│   │   ├── store.js             # Memory core: load, save, merge, session rotation
+│   │   ├── heuristics.js        # Regex-based memory extraction (name, preferences)
+│   │   ├── vector.js            # FNV-1a vector embeddings, CJK n-gram
+│   │   ├── ingest.js            # LLM-based structured memory extraction pipeline
+│   │   └── tasks.js             # Hierarchical task management
+│   ├── utils/                   # Zero-dependency utility functions
+│   │   ├── slug.js, sleep.js, which.js, uuid.js
+│   │   ├── memoize.js, ripgrep.js, theme.js
+│   │   ├── truncate.js, treeify.js, json.js
+│   │   ├── files.js, git.js
+│   │   └── ultraplan/           # Advanced planning keyword detection
+│   ├── shell/
+│   │   └── shell-exec.js        # Secure shell execution with danger detection
+│   ├── ui/
+│   │   ├── banner.js            # Startup banners
+│   │   ├── mascot.js            # CLI companion with expressions
+│   │   ├── status-bar.js        # Dynamic status line components
+│   │   └── progress.js          # Spinner, progress bar, thinking indicator
+│   └── workspace/
+│       ├── indexer.js           # Workspace file scanning (24MB budget)
+│       ├── queries.js           # File reading with line numbers, smart search
+│       └── context.js           # File context assembly
+├── docs/                        # Full documentation (Chinese + English)
+├── frees-agent.yaml             # User configuration file
+└── package.json
+```
+
+### Core execution flow
+
+```
+Start
+  │
+  ▼
+CLI entry point (cli.js)
+  │
+  ├── Load configuration (frees-agent.yaml)
+  │
+  ├── Initialize MCP clients (connect to configured MCP servers)
+  │
+  ├── Load memory state (sessions, user profile, vector index)
+  │
+  ▼
+Chat loop (chat-tool-loop.js / chat.js)
+  │
+  ├── Read user input
+  │
+  ├── Build prompts
+  │   ├── System prompt (role + safety + tool descriptions)
+  │   ├── Memory context (relevant facts + user profile)
+  │   └── User message + conversation history
+  │
+  ├── Call LLM API
+  │
+  ├── Parse response
+  │   │
+  │   ├── Text only? ──────────────► Display response, continue loop
+  │   │
+  │   ├── Tool calls detected?
+  │   │   │
+  │   │   ├── Partition: read tools (parallel) vs write tools (serial)
+  │   │   │
+  │   │   ├── Execute tools
+  │   │   │   ├── Validate shell commands (danger detection)
+  │   │   │   ├── Truncate large outputs
+  │   │   │   └── Handle errors with retry
+  │   │   │
+  │   │   └── Feed results back to LLM ──────► Continue loop
+  │   │
+  │   └── Max iterations reached? ──► Stop loop, display message
+  │
+  ├── Save memory state
+  │
+  └── Wait for next input
+```
+
+### Memory architecture
+
+```
+                    ┌──────────────────────┐
+                    │    Memory Store       │
+                    │  (src/memory/store.js)│
+                    └──────────┬───────────┘
+                               │
+            ┌──────────────────┼──────────────────┐
+            ▼                  ▼                  ▼
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │   Sessions   │  │ User Profile │  │Key Facts/Favs│
+    │ (conversation│  │ (structured  │  │ (extracted   │
+    │  history)    │  │  JSON data)  │  │  by LLM)     │
+    └──────────────┘  └──────────────┘  └──────────────┘
+                                               │
+                                               ▼
+                                      ┌──────────────┐
+                                      │ Vector Index  │
+                                      │ (256-dim FNV) │
+                                      │ (semantic     │
+                                      │  search)      │
+                                      └──────────────┘
+```
+
+Memory is loaded at startup, updated continuously during the conversation, and saved at the end of each turn. The vector index enables semantic retrieval -- when the user asks a question, the system can find related memories even if they use different wording.
+
+### Key design decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **Zero-dependency utilities** | `src/utils/` uses only Node.js built-ins. This makes these functions safe to extract and reuse in other projects. |
+| **FNV-1a instead of neural embeddings** | No external API calls, deterministic, fast, and privacy-preserving. Works offline. |
+| **YAML configuration** | Human-readable, supports comments, widely understood. |
+| **MCP over custom plugin API** | Open standard means compatibility with a growing ecosystem of MCP servers. |
+| **Read/write tool partitioning** | Maximizes throughput for read operations while preventing race conditions in write operations. |
+
+---
+
+## Configuration Guide
+
+The configuration file `frees-agent.yaml` controls every aspect of Frees-Agent's behavior. Below is a comprehensive reference.
+
+### Model configuration
+
+```yaml
+model:
+  # Provider selection
+  #   anthropic - Claude models via Anthropic API
+  #   openai    - GPT models via OpenAI API
+  #   local     - Local models via OpenAI-compatible endpoint (LM Studio, Ollama, etc.)
+  provider: anthropic
+
+  # Model name/identifier
+  name: claude-sonnet-4-6
+
+  # API key (use environment variable reference for security)
+  apiKey: "${ANTHROPIC_API_KEY}"
+
+  # Optional: custom API endpoint (useful for proxies or local servers)
+  # apiBase: "http://localhost:1234/v1"
+
+  # Generation parameters
+  maxTokens: 4096        # Maximum tokens per response
+  temperature: 0.7       # Creativity (0.0 = deterministic, 1.0 = creative)
+```
+
+**Provider-specific notes:**
+
+| Provider | `name` values | Required env var |
+|----------|---------------|------------------|
+| `anthropic` | `claude-sonnet-4-6`, `claude-opus-4-6`, `claude-haiku-4-6` | `ANTHROPIC_API_KEY` |
+| `openai` | `gpt-4o`, `gpt-4o-mini`, `o3-mini` | `OPENAI_API_KEY` |
+| `local` | Any model name exposed by your local endpoint | None |
+
+### Memory configuration
+
+```yaml
+memory:
+  enabled: true                    # Enable/disable memory system entirely
+  storeDir: "./memory"             # Directory for persistent memory storage
+  maxMemories: 200                 # Global maximum memory entries
+  maxPerCategory: 60               # Maximum entries per memory category
+
+  # Vector memory
+  vectorPath: "./memory/vectors"   # Path to vector index
+  vectorRecallThreshold: 0.06      # Minimum similarity score for recall (0-1)
+
+  # Cross-device sync
+  syncRoots:                       # List of directories for automatic memory merging
+    - "/path/to/shared/memory"
+
+  # Session management
+  maxSessionTurns: 100             # Turns before session rotation
+  autoCompact: true                # Automatically compress long sessions
+  compactModel: claude-sonnet-4-6  # Model to use for session compression
+```
+
+### MCP server configuration
+
+MCP servers are configured as an object map under `mcpServers`. Each entry defines a server name and its startup command:
+
+```yaml
+mcpServers:
+  # Simple servers (no extra args besides the package name)
+  ffmpeg:
+    command: npx
+    args:
+      - -y
+      - "@anthropic/mcp-server-ffmpeg"
+
+  # Servers with arguments
+  filesystem:
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-filesystem"
+      - "/path/to/allowed/directory"  # Restrict to this directory
+
+  # Servers requiring environment variables
+  tavily:
+    command: npx
+    args:
+      - -y
+      - "@anthropic/mcp-server-tavily"
+    env:
+      TAVILY_API_KEY: "${TAVILY_API_KEY}"  # Reference system env var
+```
+
+### Tool behavior configuration
+
+```yaml
+tools:
+  webSearch:
+    enabled: true           # Enable the built-in web search capability
+    maxResults: 5           # Maximum search results per query
+
+  # Shell execution safety
+  shell:
+    enabled: true           # Allow shell command execution
+    dangerDetection: true   # Enable dangerous command pattern blocking
+    maxOutputSize: 1048576  # Maximum output size in bytes (1 MB)
+    defaultTimeout: 30000   # Default command timeout in ms
+```
+
+### Agent behavior
+
+```yaml
+agent:
+  autonomous:
+    enabled: true           # Enable autonomous task execution
+    maxSubTasks: 10         # Maximum sub-tasks per autonomous session
+    maxIterations: 25       # Maximum tool-calling iterations per turn
+
+  # Edit agent specific
+  edit:
+    maxSteps: 20            # Maximum steps for edit-mode agent
+
+  # Safety
+  safety:
+    confirmWrite: true      # Require confirmation before file writes
+    confirmShell: true      # Require confirmation before shell commands
+    allowedPaths:           # Restrict file access to these paths
+      - "/home/user/projects"
+```
+
+---
+
+## Development
+
+### Prerequisites for development
+
+- Node.js >= 18.0.0
+- npm >= 9.0.0
+- Git
+
+### Setup
+
+```bash
+git clone https://github.com/your-username/frees-agent.git
+cd frees-agent
+npm install
+```
+
+### Project conventions
+
+- **Language**: JavaScript (Node.js), no TypeScript
+- **Style**: Standard JavaScript with JSDoc comments for API documentation
+- **Testing**: (Add test framework details here when available)
+- **Linting**: Standard ESLint configuration
+
+### Codebase map
+
+| Directory | Purpose | Key files |
+|-----------|---------|-----------|
+| `src/agent/` | Core AI agent loop, tool orchestration | `chat-tool-loop.js`, `tools.js`, `orchestration.js` |
+| `src/memory/` | All memory subsystems | `store.js`, `vector.js`, `ingest.js` |
+| `src/utils/` | Zero-dependency utility functions | `slug.js`, `truncate.js`, `git.js` |
+| `src/shell/` | Secure shell execution | `shell-exec.js` |
+| `src/ui/` | Terminal UI components | `banner.js`, `mascot.js`, `progress.js` |
+| `src/workspace/` | File indexing and workspace queries | `indexer.js`, `queries.js` |
+
+### Adding a new utility function
+
+1. Choose or create the appropriate file in `src/utils/`
+2. Keep the function pure and dependency-free (use only Node.js built-ins)
+3. Export the function via `module.exports`
+4. Add JSDoc documentation to the function
+5. Update [23-API参考文档.md](./23-API参考文档.md) with the new export
+
+### Adding a new tool
+
+Tools are registered in `src/agent/tools.js`. To add a new tool:
+
+1. Implement the tool function with signature `async (args, context) => result`
+2. Register it in `createAgentToolbox()` with name, aliases, and type (read/write)
+3. Add the tool description to `TOOL_DESCRIPTIONS` in `src/agent/prompts.js`
+4. Test the tool in chat mode
+
+### Testing MCP integrations locally
+
+```bash
+# Start a development session with verbose logging
+node src/cli.js chat --verbose
+
+# Enable debug output for MCP communication
+DEBUG=mcp:* node src/cli.js chat
+```
+
+### Building and releasing
+
+```bash
+# Check for linting issues
+npm run lint
+
+# Run tests
+npm test
+
+# Start development chat session
+npm start
+```
+
+---
+
+## Contributing
+
+### How to contribute
+
+1. **Fork** the repository
+2. **Create a feature branch**: `git checkout -b feature/my-feature`
+3. **Make your changes** following the project conventions
+4. **Commit** with clear, descriptive messages
+5. **Push** to your fork: `git push origin feature/my-feature`
+6. **Open a Pull Request** against the `main` branch
+
+### What we welcome
+
+- **Bug fixes**: Clear, minimal changes that fix a specific issue
+- **New MCP server templates**: Add configuration templates to [22-MCP工具配置模板.md](./22-MCP工具配置模板.md)
+- **Memory system improvements**: Better extraction heuristics, smarter deduplication
+- **Tool enhancements**: More utility functions, better tool descriptions
+- **Documentation**: Corrections, clarifications, translations
+- **Performance optimizations**: Faster startup, lower memory usage, fewer API calls
+
+### Guidelines
+
+- **Write clear JSDoc comments** for all public functions
+- **Keep utility functions pure** and dependency-free
+- **Add tests** for new functionality
+- **Update documentation** when changing behavior
+- **Follow existing code style** (2-space indentation, consistent naming)
+- **Prefer small, focused commits** over large monolithic changes
+
+### Code of conduct
+
+- Be respectful and constructive in discussions
+- Focus on what is best for the project and community
+- Accept constructive criticism gracefully
+- Prioritize clarity and maintainability over cleverness
+
+---
+
+## Documentation index
+
+All detailed documentation is available in the `docs/` directory:
+
+| File | Topic |
+|------|-------|
+| `01-什么是LLM模型与AI智能体.md` | LLM and AI Agent basics |
+| `02-如何训练属于自己的LLM模型.md` | Model training approaches (pre-training, SFT, LoRA, RAG) |
+| `06-如何加载模型与接入自己的模型或云端API.md` | Model loading and API integration |
+| `07-Frees-Agent记忆与超长对话.md` | Memory and long conversation handling |
+| `13-项目架构说明.md` | Project architecture deep dive |
+| `15-Frees-Agent项目源码逐文件逐函数剖析.md` | Source code analysis |
+| `16-如何接入MCP外部工具.md` | MCP external tool integration |
+| `18-agent-memory-architecture.md` | Unified memory architecture |
+| `21-自主Agent能力架构.md` | Autonomous agent capabilities |
+| `22-MCP工具配置模板.md` | MCP configuration templates |
+| `23-API参考文档.md` | Full API reference |
+
+Access documentation from the CLI:
 
 ```bash
 frees-agent docs
 frees-agent docs llm-basics
-frees-agent docs load-models
 frees-agent docs memory-long-chat
-frees-agent docs load-model-step-by-step
-frees-agent docs datasets
-frees-agent docs permissions
-frees-agent docs 12-如何拓展开发Frees-Agent
-frees-agent docs skills
-frees-agent docs source-analysis
-frees-agent permissions
-frees-agent skills
 ```
 
-## 新命令速查
+---
 
-```bash
-# 查看工作区已索引的文件
-frees-agent files ./my-project
+## License
 
-# 统计会话 token 用量
-frees-agent cost --model claude-sonnet-4-6
+[MIT License](../LICENSE)
 
-# 手动触发会话摘要压缩（需指定模型）
-frees-agent compact --model claude-sonnet-4-6
-```
+---
 
-## 工具层总览
-
-所有工具函数位于 `src/utils/`，零外部依赖，仅使用 Node.js 内置模块。
-
-| 文件 | 功能 |
-|------|------|
-| `slug.js` | Agent ID 哈希、语义化 slug 生成（形容词-动词-名词 组合） |
-| `sleep.js` | AbortSignal 感知的延迟与超时 |
-| `which.js` | 跨平台可执行文件查找（PATH 搜索 + Windows PATHEXT） |
-| `uuid.js` | Agent ID 生成与 UUID 校验 |
-| `memoize.js` | 内联 Map 缓存，支持过期时间 |
-| `ripgrep.js` | 系统 rg 检测、正则搜索、流式结果、EAGAIN 重试 |
-| `theme.js` | 4 主题系统（dark/light/dark-ansi/light-ansi），ANSI 转换 |
-| `truncate.js` | ANSI 感知文本截断，CJK 安全（中文字符按 2 宽度计算） |
-| `treeify.js` | Unicode 树形渲染，循环引用检测 |
-| `json.js` | JSON 安全解析，首个 JSON 对象提取 |
-| `files.js` | 文件类型检测（二进制/文本嗅探），格式化字节数 |
-| `git.js` | Git 仓库状态查询（根目录、分支、远程、变更文件、提交状态） |
-| `ultraplan/keyword.js` | 增强规划关键词检测 |
-
-## Shell 执行模块
-
-`src/shell/shell-exec.js` 提供安全的 shell 命令执行：
-
-- 自动检测 shell（bash/zsh/cmd/powershell）
-- 7 种危险命令模式静态拦截
-- AbortController 超时控制
-- 输出自动截断（1MB 上限）
-- Windows 兼容
-
-## Agent 循环
-
-`src/agent/` 包含 Agent 的运行循环和工具系统：
-
-| 组件 | 功能 |
-|------|------|
-| `chat-tool-loop.js` | 聊天模式工具循环：工具调用 → 结果截断 → 重试逻辑 → 消息历史裁剪 |
-| `edit-loop.js` | 编辑模式 Agent 循环：最大步数控制、JSON 动作解析 |
-| `orchestration.js` | 读写工具分区并行执行，并发控制 |
-| `prompts.js` | 系统提示词 + 10 种工具描述（参数、行为、返回值） |
-| `tools.js` | 统一工具箱：别名映射、MCP 工具集成、读写工具安全校验 |
-
-支持的工具（通过 `tools.js` 统一注册）：
-
-| 工具名 | 别名 | 分类 |
-|--------|------|------|
-| `list_files` / `glob` | — | 只读 |
-| `search_text` / `grep` | — | 只读 |
-| `read_file` / `read` | — | 只读 |
-| `web_fetch` / `fetch` | — | 只读 |
-| `write_file` / `write` | — | 写入 |
-| `replace_in_file` / `edit` | — | 写入 |
-| `bash` / `shell` / `execute_command` | — | 写入 |
-| `mcp__*` | — | 动态加载 |
-
-## 记忆系统
-
-`src/memory/` 实现分层记忆架构：
-
-| 组件 | 功能 |
-|------|------|
-| `store.js` | 记忆核心：加载/保存/合并/迁移，跨设备同步，每类记忆上限 60 条 |
-| `heuristics.js` | 启发式提取：姓名、目标、偏好正则匹配，中文/英文双模式 |
-| `vector.js` | 向量化搜索：256 维 FNV-1a 嵌入，CJK 感知 n-gram 分词，余弦相似度召回 |
-| `ingest.js` | 语义提取管线：大模型结构化抽取 + 直接正则提取 |
-| `tasks.js` | 任务记忆：加载全局和本地任务，层级合并 |
-
-关键特性：
-- **去重压缩**：`compactSimilarMemories` 基于词重叠率（>70% 判定重复）
-- **向量召回**：`queryVectorMemories` 低阈值 0.06，top-K 排序
-- **限幅保护**：全局最大 200 条，每类最多 60 条
-- **跨设备合并**：`syncRoots` 配置多个存储根自动合并
-
-## 工作区能力
-
-`src/workspace/` 提供代码库索引和文件操作：
-
-| 组件 | 功能 |
-|------|------|
-| `indexer.js` | 工作区文件递归扫描，24MB 预算保护 |
-| `queries.js` | 文件读取含行号标注、智能字符串匹配（引号归一化+邻近行提示） |
-| `context.js` | 相关文件上下文组装 |
-
-智能匹配（`queries.js`）：
-1. 精确匹配
-2. 引号归一化匹配（弯引号 → 直引号）
-3. 邻近行 hint 反馈
+*Frees-Agent: Your intelligent, extensible, command-line AI agent.*

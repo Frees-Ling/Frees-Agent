@@ -9,13 +9,13 @@ export async function runDoctorCommand(options) {
   const { client, runtime } = await createModelClient(options);
   printFreesAgentBanner(runtime, { command: 'doctor' });
 
-  console.log(`Frees Agent version: ${getFreesAgentVersion()}`);
-  console.log(`config: ${runtime.configPath}`);
-  console.log(`storageRoot: ${path.dirname(runtime.configPath)}`);
-  console.log(`provider: ${runtime.providerName}`);
-  console.log(`model: ${runtime.model}`);
-  console.log(`baseUrl: ${runtime.baseUrl}`);
-  console.log(`apiKey: ${runtime.apiKey ? 'configured' : 'not set'}`);
+  console.log(`Frees Agent 版本: ${getFreesAgentVersion()}`);
+  console.log(`配置路径: ${runtime.configPath}`);
+  console.log(`存储根目录: ${path.dirname(runtime.configPath)}`);
+  console.log(`提供者: ${runtime.providerName}`);
+  console.log(`模型: ${runtime.model}`);
+  console.log(`接口地址: ${runtime.baseUrl}`);
+  console.log(`API 密钥: ${runtime.apiKey ? '已配置' : '未设置'}`);
 
   // Config validation
   const configErrors = validateConfig(runtime.config);
@@ -30,33 +30,33 @@ export async function runDoctorCommand(options) {
 
   const formats = runtime.config.localModels || [];
   if (formats.length) {
-    console.log('\nLocal model formats:');
+    console.log('\n本地模型格式:');
     for (const model of formats) {
       console.log(`- ${model.format}: ${model.note}`);
     }
   }
 
-  console.log('\nMemory & conversation:');
-  console.log(`- memory enabled: ${runtime.config.memory?.enabled !== false}`);
-  console.log(`- auto extract: ${runtime.config.memory?.autoExtract !== false}`);
-  console.log(`- stream responses: ${runtime.config.conversation?.streamResponses !== false}`);
-  console.log(`- auto provider fallback: ${runtime.config.conversation?.autoProviderFallback !== false}`);
-  console.log(`- keep recent messages: ${runtime.config.conversation?.keepRecentMessages}`);
-  console.log(`- summarize after messages: ${runtime.config.conversation?.summarizeAfterMessages}`);
-  console.log(`- context token budget: ${runtime.config.conversation?.maxRecentContextTokens}`);
+  console.log('\n记忆与对话:');
+  console.log(`- 记忆功能: ${runtime.config.memory?.enabled !== false}`);
+  console.log(`- 自动提取: ${runtime.config.memory?.autoExtract !== false}`);
+  console.log(`- 流式输出: ${runtime.config.conversation?.streamResponses !== false}`);
+  console.log(`- 自动回退: ${runtime.config.conversation?.autoProviderFallback !== false}`);
+  console.log(`- 保留最近消息数: ${runtime.config.conversation?.keepRecentMessages}`);
+  console.log(`- 摘要触发消息数: ${runtime.config.conversation?.summarizeAfterMessages}`);
+  console.log(`- 上下文 Token 预算: ${runtime.config.conversation?.maxRecentContextTokens}`);
 
   // System integration
   const sysInt = runtime.config.systemIntegration || {};
-  console.log('\nSystem integration:');
-  console.log(`- computer control: ${sysInt.computerControl !== false}`);
-  console.log(`- shell execution: ${sysInt.shellExecution !== false}`);
-  console.log(`- tools enabled in chat: ${runtime.config.tools?.enabledInChat !== false}`);
-  console.log(`- web search: ${runtime.config.tools?.webSearch?.enabled !== false}`);
+  console.log('\n系统集成:');
+  console.log(`- 电脑控制: ${sysInt.computerControl !== false}`);
+  console.log(`- Shell 执行: ${sysInt.shellExecution !== false}`);
+  console.log(`- 聊天中启用工具: ${runtime.config.tools?.enabledInChat !== false}`);
+  console.log(`- 联网搜索: ${runtime.config.tools?.webSearch?.enabled !== false}`);
 
   // MCP diagnostics
   const mcpServers = runtime.config.mcpServers || {};
   const mcpNames = Object.keys(mcpServers);
-  console.log(`\nMCP servers: ${mcpNames.length ? mcpNames.join(', ') : 'none configured'}`);
+  console.log(`\nMCP 服务器: ${mcpNames.length ? mcpNames.join(', ') : '未配置'}`);
   if (mcpNames.length) {
     const mcpManager = new McpManager({
       config: runtime.config,
@@ -66,10 +66,10 @@ export async function runDoctorCommand(options) {
       try {
         const conn = await mcpManager.getOrConnect(name);
         const tools = await conn.listTools();
-        console.log(`  - ${name}: connected, ${tools.length} tools`);
+        console.log(`  - ${name}: 已连接，${tools.length} 个工具`);
         await conn.disconnect();
       } catch (error) {
-        console.log(`  - ${name}: FAIL (${error.message})`);
+        console.log(`  - ${name}: 失败（${error.message}）`);
       }
     }
   }
@@ -77,14 +77,14 @@ export async function runDoctorCommand(options) {
   // Workspace scan
   const workspaceRoot = path.resolve(options.workspace || process.cwd());
   const index = await scanWorkspace(workspaceRoot, runtime.config.workspace);
-  console.log('\nWorkspace scan:');
-  console.log(`- root: ${workspaceRoot}`);
-  console.log(`- files: ${index.stats.totalFiles}`);
-  console.log(`- loaded: ${index.stats.loadedFiles}`);
-  console.log(`- skipped: ${index.stats.skippedFiles}`);
+  console.log('\n工作区扫描:');
+  console.log(`- 根目录: ${workspaceRoot}`);
+  console.log(`- 文件总数: ${index.stats.totalFiles}`);
+  console.log(`- 已加载: ${index.stats.loadedFiles}`);
+  console.log(`- 已跳过: ${index.stats.skippedFiles}`);
 
   if (options.ping) {
-    console.log('\nPinging model...');
+    console.log('\n正在测试模型连接...');
     try {
       const reply = await client.generateText({
         systemPrompt: 'You are a health check assistant.',
@@ -92,9 +92,9 @@ export async function runDoctorCommand(options) {
         temperature: 1,
         maxOutputTokens: 32
       });
-      console.log(`Ping response: ${reply || '[empty]'}`);
+      console.log(`模型响应: ${reply || '[空]'}`);
     } catch (error) {
-      console.log(`Ping failed: ${error.message}`);
+      console.log(`连接测试失败: ${error.message}`);
     }
   }
 }

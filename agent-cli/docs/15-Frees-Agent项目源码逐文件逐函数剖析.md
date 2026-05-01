@@ -1,21 +1,17 @@
 # Frees Agent 项目源码逐文件逐函数剖析
 
-这份文档面向后续维护者，目标是系统性回答四个问题：
+这份文档面向后续维护者，系统性回答四个核心问题：
 
 1. 这个项目整体架构是什么
 2. 每个文件的职责是什么
 3. 每个文件中的函数或类方法做什么
 4. 当前算法思路是什么，后续还可以怎么优化
 
-本文分析范围是 `agent-cli/` 独立工程，而不是仓库里更大的原始快照代码。
-
-之所以这样划分，是因为当前真正作为 `Frees Agent` 成品 CLI 持续演进和维护的，是 `agent-cli/` 这套独立工程。仓库根目录中还存在大量历史代码和上游快照文件，它们不属于当前这套 CLI 的直接运行闭环。
+本文分析范围是 `agent-cli/` 独立工程。
 
 ---
 
 ## 0. 分析范围与完整文件清单
-
-当前纳入分析的工程文件如下。
 
 ### 0.1 可执行入口与项目元数据
 
@@ -23,79 +19,150 @@
 - `agent-cli/bin/ai-agent.js`
 - `agent-cli/README.md`
 
-### 0.2 源码文件清单
+### 0.2 源码文件清单（完整版）
 
-- `agent-cli/src/cli.js`
-- `agent-cli/src/config.js`
-- `agent-cli/src/commands/chat.js`
-- `agent-cli/src/commands/edit.js`
-- `agent-cli/src/commands/complete.js`
-- `agent-cli/src/commands/doctor.js`
-- `agent-cli/src/commands/config.js`
-- `agent-cli/src/commands/docs.js`
-- `agent-cli/src/commands/memory.js`
-- `agent-cli/src/commands/permissions.js`
-- `agent-cli/src/commands/skills.js`
-- `agent-cli/src/model/index.js`
-- `agent-cli/src/model/ollama.js`
-- `agent-cli/src/model/openai-compatible.js`
-- `agent-cli/src/model/anthropic.js`
-- `agent-cli/src/workspace/indexer.js`
-- `agent-cli/src/workspace/queries.js`
-- `agent-cli/src/agent/prompts.js`
-- `agent-cli/src/agent/tools.js`
-- `agent-cli/src/agent/edit-loop.js`
-- `agent-cli/src/memory/prompts.js`
-- `agent-cli/src/memory/store.js`
-- `agent-cli/src/memory/manager.js`
-- `agent-cli/src/memory/heuristics.js`
-- `agent-cli/src/skills/loader.js`
-- `agent-cli/src/ui/banner.js`
-- `agent-cli/src/system/permissions.js`
-- `agent-cli/src/docs/registry.js`
-- `agent-cli/src/utils/http.js`
-- `agent-cli/src/utils/json.js`
-- `agent-cli/src/utils/slug.js`
-- `agent-cli/src/utils/files.js`
+**核心入口：**
+- `src/cli.js`
 
-### 0.3 文档与测试文件
+**命令层：**
+- `src/commands/chat.js`
+- `src/commands/edit.js`
+- `src/commands/complete.js`
+- `src/commands/doctor.js`
+- `src/commands/config.js`
+- `src/commands/docs.js`
+- `src/commands/memory.js`
+- `src/commands/permissions.js`
+- `src/commands/skills.js`
+- `src/commands/files.js`
+- `src/commands/cost.js`
+- `src/commands/compact.js`
+- `src/commands/tasks.js`
+- `src/commands/gui.js`
 
-- `agent-cli/docs/README.md`
-- `agent-cli/docs/01-什么是LLM模型与AI智能体.md`
-- `agent-cli/docs/02-如何训练属于自己的LLM模型.md`
-- `agent-cli/docs/03-LM-Studio模型二次训练.md`
-- `agent-cli/docs/04-如何把模型训练到尽量稳定好用.md`
-- `agent-cli/docs/05-训练模型常见问题与解决方案.md`
-- `agent-cli/docs/06-如何加载模型与接入自己的模型或云端API.md`
-- `agent-cli/docs/07-Frees-Agent记忆与超长对话.md`
-- `agent-cli/docs/08-数据集构建清洗标注与评测.md`
-- `agent-cli/docs/09-模型应用产品化与落地路线图.md`
-- `agent-cli/docs/10-系统权限电脑控制与安全边界.md`
-- `agent-cli/docs/11-手把手把模型加载到Frees-Agent.md`
-- `agent-cli/docs/12-如何拓展开发Frees-Agent.md`
-- `agent-cli/docs/13-项目架构说明.md`
-- `agent-cli/docs/14-Skill文件支持与编写说明.md`
-- `agent-cli/docs/15-Frees-Agent项目源码逐文件逐函数剖析.md`
-- `agent-cli/test/agent-cli.test.js`
+**模型层：**
+- `src/model/index.js`
+- `src/model/ollama.js`
+- `src/model/openai-compatible.js`
+- `src/model/anthropic.js`
 
-如果后续你要我继续做“仓库根目录全部源码”的逐文件剖析，我建议单独再写第二份文档，否则会把当前 `Frees Agent` 本体和外层大型代码快照混在一起，维护者反而更难看懂。
+**工作区层：**
+- `src/workspace/indexer.js`
+- `src/workspace/queries.js`
+
+**Agent 层：**
+- `src/agent/prompts.js`
+- `src/agent/tools.js`
+- `src/agent/edit-loop.js`
+- `src/agent/chat-tool-loop.js`
+- `src/agent/orchestration.js`
+- `src/agent/reasoning.js`
+
+**记忆层：**
+- `src/memory/prompts.js`
+- `src/memory/store.js`
+- `src/memory/manager.js`
+- `src/memory/heuristics.js`
+- `src/memory/vector.js`
+- `src/memory/ingest.js`
+- `src/memory/tasks.js`
+
+**工具层：**
+- `src/tools/git.js`
+- `src/tools/search-replace.js`
+- `src/tools/mcp-client.js`
+- `src/tools/web-fetch.js`
+- `src/tools/web-search.js`
+
+**GUI 层：**
+- `src/gui/server.js`
+- `src/gui/file-tree.js`
+- `src/gui/public/app.js`
+
+**技能层：**
+- `src/skills/loader.js`
+
+**UI 层：**
+- `src/ui/banner.js`
+- `src/ui/mascot.js`
+- `src/ui/status-bar.js`
+- `src/ui/progress.js`
+
+**Shell 层：**
+- `src/shell/shell-exec.js`
+
+**系统层：**
+- `src/system/permissions.js`
+
+**配置层：**
+- `src/config.js`
+
+**插件层：**
+- `src/plugins/registry.js`
+
+**任务层：**
+- `src/tasks/queue.js`
+
+**文档层：**
+- `src/docs/registry.js`
+
+**工具函数层（utils）：**
+- `src/utils/abort.js`
+- `src/utils/array.js`
+- `src/utils/binary-check.js`
+- `src/utils/cli-args.js`
+- `src/utils/combined-abort.js`
+- `src/utils/diff.js`
+- `src/utils/file-watcher.js`
+- `src/utils/files.js`
+- `src/utils/format-time.js`
+- `src/utils/format.js`
+- `src/utils/git.js`
+- `src/utils/hash.js`
+- `src/utils/http.js`
+- `src/utils/intl.js`
+- `src/utils/json.js`
+- `src/utils/memoize.js`
+- `src/utils/ripgrep.js`
+- `src/utils/sanitize.js`
+- `src/utils/sequential.js`
+- `src/utils/set.js`
+- `src/utils/signal.js`
+- `src/utils/sleep.js`
+- `src/utils/slug.js`
+- `src/utils/stream.js`
+- `src/utils/string.js`
+- `src/utils/system-info.js`
+- `src/utils/tagged-id.js`
+- `src/utils/tempfile.js`
+- `src/utils/theme.js`
+- `src/utils/timeouts.js`
+- `src/utils/tokens.js`
+- `src/utils/treeify.js`
+- `src/utils/truncate.js`
+- `src/utils/ultraplan/keyword.js`
+- `src/utils/uuid.js`
+- `src/utils/which.js`
+- `src/utils/with-resolvers.js`
+- `src/utils/xml.js`
 
 ---
 
 ## 1. 项目总览
 
-`Frees Agent` 是一个本地优先、可扩展的终端 AI Agent CLI。它的核心能力由以下几层组成：
+`Frees Agent` 是一个本地优先、可扩展的终端 AI Agent CLI。完整架构由以下层次组成：
 
-- CLI 命令入口层
-- 模型接入层
-- 工作区扫描与查询层
-- Agent 循环层
-- 记忆与会话层
-- Skill 加载层
-- 展示与权限引导层
-- 文档与测试层
-
-它的设计目标不是“单次运行脚本”，而是“后续可以持续维护和扩展的产品型 CLI 工程”。
+- **CLI 命令入口层** — 参数解析和命令路由
+- **模型接入层** — 多 provider 抽象（Ollama / OpenAI / Anthropic / MCP）
+- **工作区扫描与查询层** — 文件索引和内容检索
+- **Agent 循环层** — 工具调用、规划、反思、多轮编辑
+- **记忆与会话层** — 画像、长期记忆、向量检索、任务追踪
+- **Tool 工具层** — Git、搜索替换、MCP 客户端、网页抓取
+- **GUI 桌面层** — Express + WebSocket 实时界面
+- **Skill 加载层** — SKILL.md 扫描和匹配
+- **展示与权限层** — 横幅、桌宠、状态栏、权限说明
+- **插件系统层** — 外部能力扩展注册
+- **文档与测试层** — 知识库和回归测试
 
 ---
 
@@ -112,33 +179,49 @@
 
 1. 命令调用 `createModelClient()`
 2. `src/model/index.js` 读取配置并解析 provider
-3. 构造具体客户端：
-   - `OllamaClient`
-   - `OpenAICompatibleClient`
-   - `AnthropicClient`
-4. 客户端统一暴露 `generateText()`
+3. 构造具体客户端：`OllamaClient` / `OpenAICompatibleClient` / `AnthropicClient`
+4. 客户端统一暴露 `generateText()` 和 `streamText()`
 
 ### 2.3 代码 Agent 链路
 
 1. `edit` 命令扫描工作区
 2. 构造工作区概览和相关文件
 3. `runEditAgent()` 进入多轮工具循环
-4. 模型只返回 JSON
+4. 模型返回 JSON 动作
 5. 工具箱执行 `list_files` / `read_file` / `replace_in_file` 等工具
 6. 输出最终总结
 
-### 2.4 记忆链路
+### 2.4 聊天工具循环链路
+
+1. 用户消息进入 `handleChat`（GUI 场景）或 `askModel`（CLI 场景）
+2. 检查本地快捷回复
+3. 可选联网搜索（Tavily）
+4. 规划器分解任务（可选）
+5. `runChatToolAgent()` 进入工具循环
+6. 并行执行只读工具，串行执行写入工具
+7. 工具执行后自动计算 diff
+8. 最终输出回复，更新记忆
+
+### 2.5 记忆链路
 
 1. 创建本地记忆存储目录
 2. 读取用户画像、长期记忆、会话数据
 3. 聊天时把这些信息注入系统上下文
-4. 每一轮对话结束后：
-   - 先做本地启发式记忆提取
-   - 再做模型驱动记忆提取
-   - 需要时做长对话摘要压缩
-5. 持久化回本地 `.frees-agent/`
+4. 每一轮对话结束后做记忆提取（本地启发式 + 模型驱动）
+5. 向量索引同步更新
+6. 任务记忆自动推断
+7. 长对话摘要压缩
+8. 持久化回本地 `.frees-agent/`
 
-### 2.5 Skill 链路
+### 2.6 GUI 启动链路
+
+1. `gui` 命令调用 `runGuiCommand()`
+2. 两阶段启动：先起 Express/WebSocket 服务（4s 内响应）
+3. 后台初始化：模型连接、工作区扫描、MCP 连接、记忆加载
+4. 前端显示"正在初始化..."直到就绪
+5. 尝试启动 Tauri 原生窗口，失败则回退到 Web 模式
+
+### 2.7 Skill 链路
 
 1. 扫描个人目录和项目目录中的 `SKILL.md`
 2. 读取 frontmatter 和正文
@@ -151,43 +234,49 @@
 
 ### 根目录层
 
-- `package.json`
-  定义包名、可执行命令和脚本
-- `README.md`
-  项目入口说明
-- `bin/`
-  命令行可执行入口
-- `src/`
-  全部源码
-- `docs/`
-  文档知识库
-- `test/`
-  单元测试
+- `package.json` — 包名、可执行命令、脚本
+- `README.md` — 项目入口说明
+- `bin/` — 命令行可执行入口
+- `src/` — 全部源码
+- `docs/` — 文档知识库
+- `test/` — 单元测试
 
 ### 源码层
 
-- `src/cli.js`
-  总入口
-- `src/commands/`
-  命令分发后的具体实现
-- `src/model/`
-  模型 provider 层
-- `src/workspace/`
-  工作区扫描、搜索、文件读写查询
-- `src/agent/`
-  Agent 提示词和多轮编辑循环
-- `src/memory/`
-  用户画像、长期记忆、会话摘要
-- `src/skills/`
-  skill 扫描和匹配
-- `src/ui/`
-  banner 和展示
-- `src/system/`
-  权限和系统行为说明
-- `src/utils/`
-  通用基础工具
-- `src/docs/`
-  文档索引表
+```
+src/
+├── cli.js                      # CLI 总入口
+├── config.js                   # 配置管理
+├── commands/                   # 命令分发后的具体实现
+│   ├── chat.js                 # 交互式聊天
+│   ├── edit.js                 # 代码编辑 Agent
+│   ├── complete.js             # 代码补全
+│   ├── doctor.js               # 环境诊断
+│   ├── config.js               # 配置初始化
+│   ├── docs.js                 # 文档查看
+│   ├── memory.js               # 记忆管理
+│   ├── permissions.js          # 权限说明
+│   ├── skills.js               # 技能管理
+│   ├── files.js                # 文件列表
+│   ├── cost.js                 # Token 用量统计
+│   ├── compact.js              # 会话压缩
+│   ├── tasks.js                # 任务管理
+│   └── gui.js                  # GUI 启动
+├── model/                      # 模型 provider 层
+├── workspace/                  # 工作区扫描和查询
+├── agent/                      # Agent 循环和提示词
+├── memory/                     # 记忆系统
+├── tools/                      # 工具实现
+├── gui/                        # GUI 桌面应用
+├── skills/                     # skill 扫描和匹配
+├── ui/                         # 界面组件
+├── shell/                      # Shell 执行
+├── system/                     # 权限和系统行为
+├── plugins/                    # 插件注册表
+├── tasks/                      # 任务队列
+├── docs/                       # 文档索引
+└── utils/                      # 通用工具函数
+```
 
 ---
 
@@ -196,43 +285,29 @@
 ### `agent-cli/package.json`
 
 职责：
-
 - 定义包名 `frees-agent-cli`
 - 定义命令入口 `frees-agent` / `ai-agent`
-- 定义最小运行 Node 版本
+- 定义最小运行 Node 版本（>=18）
 - 定义常用脚本
 
-这个文件没有函数，但它控制了安装、启动和分发行为。
+关键依赖：express、ws（WebSocket）
 
 ### `agent-cli/bin/ai-agent.js`
 
 职责：
-
 - 作为 Node 可执行脚本入口
 - 导入 `main()`
-- 捕获顶层未处理错误并统一输出
+- 捕获顶层未处理错误
 
 函数/逻辑：
-
-- 顶层 `main().catch(...)`
-  负责兜底异常，避免 CLI 直接崩溃到无提示状态。
-
-### `agent-cli/README.md`
-
-职责：
-
-- 面向用户介绍 Frees Agent 功能
-- 提供常用命令示例
-- 说明本地存储与扩展方向
-
-没有函数。
+- 顶层 `main().catch(...)` — 兜底异常处理
+- 使用 `process.on('uncaughtException')` 做最终兜底
 
 ---
 
 ## 5. `src/cli.js` 逐函数分析
 
 职责：
-
 - 统一参数解析
 - 路由到各命令处理函数
 - 输出帮助文本
@@ -240,53 +315,27 @@
 函数：
 
 ### `printHelp()`
-
-职责：
-
-- 输出 CLI 帮助说明
-
-特点：
-
-- 是全部命令帮助的单一入口
-- 现在已经包含 `memory`、`docs`、`permissions`、`skills`
+输出 CLI 帮助说明。包含全部命令的帮助信息：chat、edit、complete、doctor、config、memory、docs、permissions、skills、files、cost、compact、tasks、gui。
 
 ### `main(argv)`
-
-职责：
-
-- CLI 总调度函数
+CLI 总调度函数。
 
 行为：
-
 - 解析第一个 token 作为命令名
-- 进入不同分支：
-  - `chat`
-  - `edit`
-  - `complete`
-  - `doctor`
-  - `config`
-  - `memory`
-  - `docs`
-  - `permissions`
-  - `skills`
-
-算法特点：
-
+- 进入不同分支：chat / edit / complete / doctor / config / memory / docs / permissions / skills / files / cost / compact / tasks / gui
 - 使用 Node 原生 `parseArgs`
 - 每个命令单独定义参数结构
-- 分支清晰，但随着命令继续增多，未来可以进一步拆成命令注册表
 
 优化方向：
-
 - 把命令定义抽成 declarative registry
-- 自动生成帮助文档，避免 `HELP_TEXT` 手工维护成本过高
+- 自动生成帮助文档
+- 支持子命令注册
 
 ---
 
 ## 6. `src/config.js` 逐函数分析
 
 职责：
-
 - 管理默认配置
 - 读取/合并/写入配置
 - 决定本地配置目录位置
@@ -294,79 +343,36 @@
 常量：
 
 ### `DEFAULT_CONFIG`
-
-职责：
-
-- 定义默认 provider、默认模型、工作区、记忆、长对话、系统集成参数
+定义默认 provider（ollama）、默认模型、工作区、记忆、长对话、工具、MCP、GUI 等参数。
 
 函数：
 
 ### `isObject(value)`
-
-职责：
-
-- 判断值是否是普通对象
-
-用途：
-
-- 给深度合并逻辑做类型判断
+判断值是否是普通对象。给深度合并逻辑做类型判断。
 
 ### `deepMerge(base, override)`
-
-职责：
-
-- 把用户配置覆盖到默认配置上
-
-算法：
-
-- 递归合并对象
-- 对标量和数组采用覆盖策略
+把用户配置覆盖到默认配置上。递归合并对象，对标量和数组采用覆盖策略。
 
 ### `getDefaultConfig()`
-
-职责：
-
-- 返回默认配置副本
+返回默认配置副本。
 
 ### `getDefaultConfigPath()`
-
-职责：
-
-- 决定默认配置路径
-
-当前行为：
-
-- 若设置 `FREES_AGENT_HOME`，则使用该目录
-- 否则默认使用当前工作目录下的 `.frees-agent/config.json`
-
-这是“本地优先、项目内存储”的关键入口。
+决定默认配置路径。若设置 `FREES_AGENT_HOME`，则使用该目录；否则使用当前工作目录下的 `.frees-agent/config.json`。
 
 ### `getConfigPath(explicitPath)`
-
-职责：
-
-- 在显式传参、环境变量和默认路径之间选择配置路径
+在显式传参、环境变量和默认路径之间选择配置路径。
 
 ### `loadConfig(explicitPath)`
-
-职责：
-
-- 读取配置文件
-- 解析 JSON
-- 与默认配置做深度合并
+读取配置文件，解析 JSON，与默认配置做深度合并。
 
 ### `writeDefaultConfig(explicitPath, { force })`
-
-职责：
-
-- 在目标路径写出默认配置模板
-- 处理覆盖保护
+在目标路径写出默认配置模板，处理覆盖保护。
 
 优化方向：
-
-- 配置 schema 校验
+- 配置 schema 校验（JSON Schema）
 - 配置注释模板生成
 - 区分项目配置与全局配置
+- 配置热重载
 
 ---
 
@@ -375,20 +381,15 @@
 ### `chat.js`
 
 职责：
-
 - 负责交互式聊天和单条消息聊天
 - 串接工作区、记忆、长对话、skill、模型
 
 函数：
 
 #### `runChatCommand(options)`
-
-职责：
-
-- 聊天命令主实现
+聊天命令主实现。
 
 内部关键阶段：
-
 1. 创建模型客户端
 2. 显示 banner
 3. 默认把当前目录作为工作区
@@ -397,24 +398,10 @@
 6. 定义内部函数 `askModel()`
 7. 进入 readline 循环
 
-内部算法亮点：
-
-- 默认工作区扫描
-- 本地记忆优先
-- `resolveLocalChatShortcut()` 先处理简单可确定问题
-- 对复杂问题再走模型
-- 聊天中支持 `/reload` `/memory` `/profile` `/summary` `/skills`
-
 内部函数（闭包）：
 
 #### `askModel(message)`
-
-职责：
-
-- 处理单轮聊天请求
-
-行为：
-
+处理单轮聊天请求。
 - 先尝试本地快捷回答
 - 挑选相关文件
 - 挑选相关 skill
@@ -423,24 +410,17 @@
 - 更新记忆
 - 触发长对话压缩
 
-优化方向：
+支持的聊天命令：`/reload` `/memory` `/profile` `/summary` `/skills`
 
-- 增加流式输出
+优化方向：
+- 增加流式输出（已部分实现）
 - 增加 retry 与 provider fallback
 - 增加对话级 token 预算
 
 ### `edit.js`
 
-函数：
-
 #### `runEditCommand(options)`
-
-职责：
-
-- 执行代码 Agent 主命令
-
-行为：
-
+执行代码 Agent 主命令。
 - 校验参数
 - 扫描工作区
 - 构造概览和相关文件
@@ -449,16 +429,8 @@
 
 ### `complete.js`
 
-函数：
-
 #### `runCompleteCommand(options)`
-
-职责：
-
-- 执行上下文感知代码补全
-
-行为：
-
+执行上下文感知代码补全。
 - 扫描工作区
 - 找相关文件
 - 可选读取目标文件
@@ -467,77 +439,104 @@
 
 ### `config.js`
 
-函数：
-
 #### `runConfigCommand(options)`
-
-职责：
-
-- 处理配置初始化与查看
+处理配置初始化与查看。
 
 ### `docs.js`
 
-函数：
-
 #### `runDocsCommand(options)`
-
-职责：
-
-- 列出文档主题
-- 输出某一篇文档内容
+列出文档主题，输出某一篇文档内容。
 
 ### `doctor.js`
 
-函数：
-
 #### `runDoctorCommand(options)`
-
-职责：
-
-- 输出 Frees Agent 当前环境诊断
-
-内容包括：
-
+输出 Frees Agent 当前环境诊断。
 - 当前配置路径
 - 存储根目录
 - provider / model / baseUrl
-- 本地模型格式说明
 - 记忆和长对话配置
 - 工作区扫描结果
 - 可选 ping 测试
 
 ### `memory.js`
 
-函数：
-
 #### `runMemoryCommand(options)`
-
-职责：
-
-- 查看记忆
-- 清理记忆
-- 列出 session 文件
+查看记忆、清理记忆、列出 session 文件、合并跨设备记忆。
 
 ### `permissions.js`
 
-函数：
-
 #### `runPermissionsCommand()`
-
-职责：
-
-- 打印当前平台的权限引导文案
+打印当前平台的权限引导文案。
 
 ### `skills.js`
 
-函数：
-
 #### `runSkillsCommand(options)`
+列出工作区和个人 skills，输出指定 skill 的内容。
 
-职责：
+### `files.js`
 
-- 列出工作区和个人 skills
-- 输出指定 skill 的内容
+#### `runFilesCommand(options)`
+列出工作区已索引的文件。
+
+### `cost.js`
+
+#### `runCostCommand(options)`
+统计会话 token 用量。
+
+### `compact.js`
+
+#### `runCompactCommand(options)`
+手动触发会话摘要压缩。
+
+### `tasks.js`
+
+#### `runTasksCommand(options)`
+管理任务记忆（查看/清理）。
+
+### `gui.js`
+
+#### `runGuiCommand(options)`
+构建和启动 Frees-Agent 桌面 GUI。
+
+行为：
+1. 调用 `buildServer()` 启动 Express + WebSocket 服务
+2. 尝试启动 Tauri 原生桌面应用
+3. 如果 Tauri 不可用，回退到 Web UI 模式
+4. 后台初始化模型、工作区、MCP、记忆
+
+内部函数：
+
+#### `buildServer(options)`
+两阶段服务构建。
+
+阶段一（即时响应）：
+- 创建 minimal runtime
+- 调用 `createGuiServer()` 立即启动 HTTP/WebSocket 服务
+- 使用 fallback client 直到真正初始化完成
+
+阶段二（后台初始化）：
+- 连接模型 provider（失败时使用 fallback）
+- 扫描工作区索引
+- 加载 skills
+- 连接 MCP 服务器
+- 加载记忆状态
+- 启动文件变更监视器（`createWorkspaceWatcher`）
+- 收集工具列表和会话列表
+
+`handleChat()` 闭包是 WebSocket 消息处理的核心函数：
+- 检查本地快捷回复
+- 附加语义记忆
+- 可选联网搜索
+- 规划器分解任务
+- 工具循环（`runChatToolAgent`）或纯文本流式回复
+- 每轮对话后更新记忆
+- 写入操作自动计算并推送 diff
+
+`createFallbackClient()` — 当无可用模型时返回错误提示客户端。
+
+`formatSkillContext()` — 格式化 skills 为 prompt 注入文本。
+
+`tryRunTauri()` — 尝试启动 Tauri 原生二进制。
 
 ---
 
@@ -546,91 +545,49 @@
 ### `model/index.js`
 
 职责：
-
 - provider 抽象层入口
 - 统一构造模型客户端
 
 函数：
 
 #### `getApiKey({ apiKey, apiKeyEnv, configKeyEnv })`
-
-职责：
-
-- 根据命令行、环境变量和配置项选取 API Key
+根据命令行、环境变量和配置项选取 API Key。
 
 #### `resolveModelRuntime(options)`
-
-职责：
-
-- 把配置、provider、model、baseUrl、apiKey 解析成运行时对象
+把配置、provider、model、baseUrl、apiKey 解析成运行时对象。
 
 #### `createModelClient(options)`
+根据 providerName 实例化具体客户端。支持 ollama / openai-compatible / anthropic / mcp。
 
-职责：
-
-- 根据 providerName 实例化具体客户端
-
-优化方向：
-
-- 注册表模式替代 `if/else`
-- 增加 provider 插件机制
+#### `createRoleModelClient(options, role)`
+为指定角色（planner/critic）创建独立的模型客户端，支持角色级 provider 覆盖。
 
 ### `model/openai-compatible.js`
-
-职责：
-
-- 对接 OpenAI 兼容接口
-
-函数：
-
-#### `normalizeMessageContent(content)`
-
-职责：
-
-- 把兼容接口返回的字符串或块列表统一转成纯文本
 
 类：
 
 #### `OpenAICompatibleClient`
-
-##### `constructor({ baseUrl, apiKey, model })`
-
-- 保存运行时参数
-
-##### `generateText(...)`
-
-- 发送 Chat Completions 请求
-- 失败时输出更友好的 LM Studio / 网关诊断信息
+- `constructor({ baseUrl, apiKey, model })` — 保存运行时参数
+- `generateText(...)` — 发送 Chat Completions 请求
+- `streamText(...)` — 流式版，逐 token 回调
 
 ### `model/ollama.js`
 
 类：
 
 #### `OllamaClient`
-
-##### `constructor({ baseUrl, model })`
-
-- 保存 Ollama 地址与模型名
-
-##### `generateText(...)`
-
-- 调用 Ollama `/api/chat`
-- 失败时输出针对 Ollama 的诊断提示
+- `constructor({ baseUrl, model })` — 保存 Ollama 地址与模型名
+- `generateText(...)` — 调用 Ollama `/api/chat`
+- `streamText(...)` — 流式版
 
 ### `model/anthropic.js`
 
 类：
 
 #### `AnthropicClient`
-
-##### `constructor({ baseUrl, apiKey, model })`
-
-- 保存 Anthropic 连接参数
-
-##### `generateText(...)`
-
-- 调用 `/v1/messages`
-- 把 text block 拼接成输出
+- `constructor({ baseUrl, apiKey, model })` — 保存 Anthropic 连接参数
+- `generateText(...)` — 调用 `/v1/messages`
+- `streamText(...)` — 流式版
 
 ---
 
@@ -638,119 +595,52 @@
 
 ### `workspace/indexer.js`
 
-职责：
-
-- 扫描工作区
-- 建立内存索引
-- 生成概览
-- 选相关文件
-
 常量：
 
 #### `DEFAULT_IGNORE_NAMES`
-
-- 默认忽略目录集合
+默认忽略目录集合（.git, node_modules, dist 等）。
 
 函数：
 
 #### `scanWorkspace(workspaceRoot, config)`
-
-职责：
-
-- 遍历工作区文件
-- 跳过忽略目录
-- 按文件大小与总大小限制决定是否加载
-- 把文本文件内容放入索引
-
-核心算法：
-
-- DFS 遍历目录
-- 基于大小阈值截断
-- 基于二进制检测跳过二进制文件
+递归遍历工作区文件，跳过忽略目录和二进制文件，按大小阈值加载文本文件内容到索引。
 
 #### `buildWorkspaceOverview(index, { maxFiles })`
-
-- 把索引压缩成 prompt 友好的概要文本
-
-#### `tokenize(text)`
-
-- 把任务文本分词成关键词
+把索引压缩成 prompt 友好的概要文本。
 
 #### `findRelevantFiles(index, task, limit)`
-
-职责：
-
-- 通过简单加权匹配选出相关文件
-
-算法：
-
-- 路径命中分更高
-- 内容命中分较低
-- 最终排序取前 N 项
-
-优点：
-
-- 无依赖、速度快
-
-局限：
-
-- 语义检索弱
-- 无 embedding 召回
+通过简单加权匹配选出相关文件。路径命中分更高，内容命中分较低，最终排序取前 N 项。
 
 ### `workspace/queries.js`
-
-职责：
-
-- 提供 Agent 工具读写接口
 
 函数：
 
 #### `globToRegExp(pattern)`
-
-- 把简化 glob 转成正则
-
-#### `toRelative(index, targetPath)`
-
-- 统一输出 `/` 风格路径
+把简化 glob 转成正则。
 
 #### `listFiles(index, opts)`
-
-- 按前缀和 glob 列文件
+按前缀和 glob 列文件。
 
 #### `searchText(index, opts)`
-
-- 在已加载文本文件中逐行搜索
-- 支持简单文本或 `/regex/flags`
+在已加载文本文件中逐行搜索，支持简单文本或 `/regex/flags`。
 
 #### `readIndexedFile(index, relativePath, opts)`
-
-- 读取文件片段并加上行号
+读取文件片段并加上行号。
 
 #### `writeWorkspaceFile(index, relativePath, content)`
-
-- 写文件并刷新索引
+写文件并刷新索引。
 
 #### `replaceInWorkspaceFile(index, relativePath, oldText, newText, replaceAll)`
-
-- 在内存内容中做替换并落盘
+在内存内容中做替换并落盘。
 
 #### `createWorkspaceDirectory(index, relativePath)`
-
-- 创建目录
+创建目录。
 
 #### `deleteWorkspaceFile(index, relativePath)`
-
-- 删除文件并更新索引
+删除文件并更新索引。
 
 #### `refreshFile(index, relativePath)`
-
-- 单文件重载到索引
-
-优化方向：
-
-- 引入真正的 glob 库
-- 引入增量索引
-- 引入大文件分块读取
+单文件重载到索引。
 
 ---
 
@@ -758,106 +648,98 @@
 
 ### `agent/prompts.js`
 
-职责：
-
-- 集中管理聊天、编辑、补全提示词
-
 常量：
 
-#### `EDIT_AGENT_SYSTEM_PROMPT`
-
-- 约束编辑代理必须输出 JSON
-
-#### `CHAT_SYSTEM_PROMPT`
-
-- 约束聊天风格简洁、不重复自我介绍
-
-#### `COMPLETE_SYSTEM_PROMPT`
-
-- 约束补全结果偏代码而不是长解释
+- `EDIT_AGENT_SYSTEM_PROMPT` — 约束编辑代理输出 JSON
+- `CHAT_SYSTEM_PROMPT` — 约束聊天风格
+- `CHAT_TOOL_SYSTEM_PROMPT` — 约束聊天工具循环 JSON
+- `COMPLETE_SYSTEM_PROMPT` — 约束补全结果
+- `TOOL_DESCRIPTIONS` — 10 种工具的描述字典
 
 函数：
 
-#### `formatRelevantFiles(files, opts)`
-
-- 把相关文件压缩为 prompt 片段
-
-#### `buildEditUserPrompt(...)`
-
-- 生成代码编辑任务 prompt
-
-#### `buildChatUserPrompt(...)`
-
-- 生成聊天任务 prompt，并插入 skill 上下文
-
-#### `buildCompletionPrompt(...)`
-
-- 生成代码补全 prompt
+- `formatRelevantFiles(files, opts)` — 压缩文件为 prompt 片段
+- `buildEditUserPrompt(...)` — 生成代码编辑任务 prompt
+- `buildChatUserPrompt(...)` — 生成聊天任务 prompt，插入 skill/规划/联网上下文
+- `buildChatToolUserPrompt(...)` — 生成聊天工具循环 prompt
+- `buildCompletionPrompt(...)` — 生成代码补全 prompt
 
 ### `agent/tools.js`
 
-职责：
-
-- 把工作区查询接口封装成编辑代理工具箱
-
-函数：
-
-#### `createAgentToolbox(index, { dryRun })`
-
-返回：
-
-- `changes`
-  记录变更轨迹
-- `runTool(name, args)`
-  调度工具执行
+#### `createAgentToolbox(index, { dryRun, readOnly, config })`
+创建统一工具箱，包含别名映射、MCP 工具集成、安全校验。
 
 内部工具映射：
-
-- `list_files`
-- `search_text`
-- `read_file`
-- `mkdir`
-- `write_file`
-- `replace_in_file`
-- `delete_file`
+- `list_files` / `glob`
+- `search_text` / `grep`
+- `read_file` / `read`
+- `web_fetch` / `fetch`
+- `write_file` / `write`
+- `replace_in_file` / `edit`
+- `bash` / `shell` / `execute_command`
+- `mcp__*` — 动态加载的 MCP 工具
+- `search_and_replace` — 上下文感知搜索替换
+- `git_status` / `git_diff` / `git_commit` / `git_log` / `git_branch` / `git_checkout` / `git_add`
 
 ### `agent/edit-loop.js`
 
-职责：
-
-- 实现编辑代理的多轮 JSON 工具循环
-
-函数：
-
 #### `isToolAction(action)`
-
-- 判断是否是工具调用 JSON
+判断是否是工具调用 JSON。
 
 #### `isFinalAction(action)`
-
-- 判断是否是最终输出 JSON
-
-#### `formatToolResult(name, result)`
-
-- 把工具结果压缩成可回灌给模型的字符串
+判断是否是最终输出 JSON。
 
 #### `runEditAgent(opts)`
+核心编辑代理循环。最多迭代 `maxSteps`，每轮调用模型、解析 JSON、执行工具或结束、非法 JSON 回灌纠错提示。
 
-- 核心编辑代理循环
+### `agent/chat-tool-loop.js`
 
-算法：
+#### `runChatToolAgent({ client, toolbox, message, ... })`
+聊天工具循环。支持：
+- 多步迭代（maxSteps）
+- 并发执行只读工具 + 串行执行写入工具
+- 自动重试（最多 2 次）
+- 消息历史裁剪
+- 连续 JSON 解析失败保护（3 次阈值）
 
-- 最多迭代 `maxSteps`
-- 每轮调用模型
-- 解析 JSON
-- 工具调用或结束
-- 如果模型返回非法 JSON，则回灌纠错提示
+#### `extractMultipleJsonObjects(text)`
+从模型回复中提取多个 JSON 对象。先尝试解析为 JSON 数组，再通过正则提取对象。
 
-优化方向：
+#### `executeWithRetry(toolbox, toolName, args, maxRetries)`
+带重试的工具执行。对瞬时错误（EAGAIN、超时、429 等）自动重试。
 
-- 支持流式 reasoning
-- 支持补丁级 diff 输出
-- 支持更精细的中断/回滚
+#### `isTransientError(error)`
+判断是否为可重试的瞬时错误。
+
+#### `trimMessageHistory(messages)`
+消息历史裁剪，保留首条和最近 N 条。
+
+### `agent/orchestration.js`
+
+#### `partitionTools(toolUses)`
+将工具分为只读（并发）和写入（串行）两组。只读工具包括 list_files、search_text、read_file、web_search、web_fetch、mcp__*。
+
+#### `executeToolBatch(toolUses, runToolFn, { concurrency })`
+并发执行工具批，默认并发数 5。
+
+#### `executeToolsSequential(toolUses, runToolFn)`
+串行执行写入工具。
+
+#### `formatToolResults(results)`
+格式化工具执行结果为 prompt 可读文本。
+
+### `agent/reasoning.js`
+
+#### `buildStructuredPlan({ plannerClient, message, workspaceOverview, enabled })`
+构建结构化执行计划。支持普通模式和增强模式（ultraplan 关键词触发 DAG 分解）。
+
+返回 `{ steps, complexity, dependencies, risks, estimatedEffort, toolsNeeded }`。
+
+#### `buildExecutionPlan({ plannerClient, message, workspaceOverview, enabled })`
+构建执行计划提示文本，供注入 chat prompt。
+
+#### `reflectAndRevise({ criticClient, userMessage, draftReply, enabled })`
+回答质检与修正。使用专门的 critic 模型检查是否存在遗漏、逻辑错误，需要时生成改进版回复。
 
 ---
 
@@ -865,662 +747,611 @@
 
 ### `memory/prompts.js`
 
-职责：
-
-- 管理记忆提取和长对话压缩相关提示词
-
 常量：
-
-#### `MEMORY_EXTRACT_SYSTEM_PROMPT`
-
-- 要求模型只返回结构化记忆 JSON
-
-#### `SUMMARY_SYSTEM_PROMPT`
-
-- 要求模型只返回结构化摘要 JSON
+- `MEMORY_EXTRACT_SYSTEM_PROMPT` — 模型记忆提取系统提示
+- `SUMMARY_SYSTEM_PROMPT` — 对话摘要系统提示
 
 函数：
-
-#### `buildMemoryExtractionPrompt(...)`
-
-- 构造记忆提取 prompt
-
-#### `buildSummaryPrompt(...)`
-
-- 构造对话摘要 prompt
-
-#### `buildMemoryContext(...)`
-
-- 把用户画像、长期记忆、会话摘要拼成聊天系统上下文
-
-### `memory/heuristics.js`
-
-职责：
-
-- 提供本地可确定执行的记忆规则
-
-函数：
-
-#### `cleanCapture(value)`
-
-- 清洗从正则中提取的字段
-
-#### `tryMatchName(userMessage)`
-
-- 从用户话术中提取名字
-
-#### `tryMatchGoal(userMessage)`
-
-- 从用户话术中提取目标
-
-#### `tryMatchPreference(userMessage)`
-
-- 从用户话术中提取偏好
-
-#### `inferLocalMemory(userMessage)`
-
-- 用本地规则生成 `profilePatch` 和 `durableMemories`
-
-#### `resolveLocalChatShortcut(message, state)`
-
-- 对简单问答做本地快捷响应
-
-当前支持：
-
-- 打招呼
-- “我叫什么名字”
-
-这一步是当前“记忆稳定性”的关键，因为不再完全依赖模型发挥。
+- `buildMemoryExtractionPrompt(...)` — 构造记忆提取 prompt
+- `buildSummaryPrompt(...)` — 构造对话摘要 prompt
+- `buildMemoryContext(...)` — 把画像、长期记忆、会话摘要拼成聊天上下文
 
 ### `memory/store.js`
 
-职责：
-
-- 本地记忆文件持久化层
-
 函数：
-
-#### `isObject(value)`
-
-- 判断普通对象
-
-#### `mergeUniqueArray(left, right)`
-
-- 合并数组并去重
-
-#### `mergeProfile(base, patch)`
-
-- 把画像 patch 合并到已有画像
-
-#### `readJson(filePath, fallback)`
-
-- 读取 JSON 文件，ENOENT 时返回默认值
-
-#### `writeJson(filePath, value)`
-
-- 写 JSON 文件
-
-#### `getStorageRoot(configPath)`
-
-- 根据配置路径推导存储根目录
-
-#### `createSessionId({ workspaceRoot, sessionName })`
-
-- 生成稳定 session id
-
-算法：
-
-- `workspace basename + session slug + shortHash`
-
-#### `createMemoryStore(...)`
-
-- 构造 profile / memories / sessions 路径对象
-
-#### `loadMemoryState(store, config)`
-
-- 读取完整记忆状态
-
-#### `saveMemoryState(state)`
-
-- 落盘写回
-
-#### `mergeMemoryExtraction(state, extraction, config)`
-
-- 把提取结果合并到状态中
-
-#### `appendTurnToSession(state, userMessage, assistantMessage)`
-
-- 将一轮对话写入 session
-
-#### `getRecentMessagesForModel(state)`
-
-- 提供近期消息给模型
-
-#### `clearMemoryState(state, options)`
-
-- 按粒度清空 profile / durable / session
-
-#### `listSessions(storeRoot)`
-
-- 列出 session 文件
-
-#### `clearAllSessionFiles(storeRoot)`
-
-- 清空全部 session 文件
+- `createMemoryStore(...)` — 创建记忆存储路径对象
+- `loadMemoryState(store, config)` — 加载完整记忆状态
+- `saveMemoryState(state)` — 落盘写回
+- `mergeMemoryExtraction(state, extraction, config)` — 合并提取结果
+- `appendTurnToSession(state, userMessage, assistantMessage)` — 追加对话轮次
+- `getRecentMessagesForModel(state)` — 获取近期消息
+- `clearMemoryState(state, options)` — 按粒度清除
+- `listSessions(storeRoot)` — 列出会话文件
+- `clearAllSessionFiles(storeRoot)` — 清空全部会话
+- `createSession(...)` — 创建新会话
+- `renameSession(...)` — 重命名会话
+- `deleteSession(...)` — 删除会话
+- `loadSessionIndex(...)` — 加载会话索引
 
 ### `memory/manager.js`
 
-职责：
+函数：
+- `buildChatSystemPrompt({ baseSystemPrompt, state, config })` — 拼接记忆上下文到系统提示词
+- `updateMemoryAfterTurn(...)` — 单轮对话后更新记忆（先 append turn -> 本地启发式 -> 模型提取 -> 落盘）
+- `compactConversationIfNeeded(...)` — 超过阈值时压缩旧消息（保留最近 N 条，旧的做摘要）
+- `describeMemoryState(state)` — 记忆状态描述
+- `attachSemanticMemoriesToState(...)` — 附加语义相关记忆
 
-- 记忆层编排器
+### `memory/heuristics.js`
 
 函数：
+- `inferLocalMemory(userMessage)` — 用本地规则生成 profilePatch 和 durableMemories
+- `resolveLocalChatShortcut(message, state)` — 对简单问答做本地快捷响应（打招呼、问名字等）
+- `isLikelyValidName(value)` — 校验是否为合法姓名
+- `sanitizeProfilePatch(profile)` — 清洗用户画像
 
-#### `normalizeSummaryPayload(payload)`
+### `memory/vector.js`
 
-- 标准化摘要 JSON 为最终文本摘要
+#### `embedText(text)`
+将文本转为 256 维向量。使用 FNV-1a 哈希，CJK 感知分词，n-gram 增强部分匹配。
 
-#### `buildChatSystemPrompt({ baseSystemPrompt, state, config })`
+#### `loadVectorIndex(vectorPath)`
+从文件加载向量索引。
 
-- 把记忆上下文拼接进聊天系统提示词
+#### `upsertDurableMemoriesToVectorIndex(vectorPath, durableMemories)`
+将持久化记忆同步到向量索引，上限 500 条。
 
-#### `updateMemoryAfterTurn(...)`
+#### `queryVectorMemories(vectorPath, query, topK)`
+查询相似记忆，余弦相似度排序，过滤 score <= 0.06 的低质量结果。
 
-- 单轮对话后更新记忆
+### `memory/ingest.js`
 
-算法：
+函数：
+- `extractProfileFromText(text)` — 从用户文本中提取画像字段（技能、技术栈、目标、偏好等）
+- `normalizeProfilePatch(profilePatch)` — 标准化用户画像
+- `routeMemoryExtraction(extraction)` — 路由记忆提取结果到对应的画像字段或持久化记忆
+- `mergeMemoryExtractions(...extractions)` — 合并多次提取结果
+- `normalizeDurableMemories(memories)` — 去重和标准化持久记忆
 
-- 先 append turn
-- 再合并本地启发式记忆
-- 再可选调用模型提取长期记忆
-- 最后落盘
+### `memory/tasks.js`
 
-#### `compactConversationIfNeeded(...)`
-
-- 超过阈值时压缩旧消息
-
-算法：
-
-- 保留最近 N 条消息
-- 更老消息喂给模型做摘要
-- 如果模型失败，则使用 fallback 文本拼接摘要
-
-#### `describeMemoryState(state)`
-
-- 输出给用户看的记忆状态对象
+函数：
+- `loadTaskMemory(taskPath)` — 加载任务记忆
+- `saveTaskMemory(taskPath, tasks)` — 保存任务记忆
+- `inferTasksFromMessage(text)` — 从用户消息中推断任务
+- `mergeTasks(existingTasks, inferredTasks)` — 合并现有任务和新推断的任务
 
 ---
 
-## 12. `src/skills/loader.js` 逐函数分析
+## 12. `src/tools/` 逐文件逐函数分析
 
-职责：
-
-- 发现 skill 文件
-- 解析 skill 内容
-- 做相关性匹配
+### `tools/git.js`
 
 函数：
 
-#### `walk(dirPath, files)`
+#### `execGit(args, cwd)`
+内部函数，使用 spawnSync 执行 git 命令，避免 shell 转义问题。
 
-- 递归收集 `SKILL.md`
+#### `gitStatus({ cwd })`
+查看 git 工作区状态。返回分支名、已暂存/已修改/未跟踪/冲突文件列表。
 
-#### `parseFrontmatter(raw)`
+#### `gitDiff({ staged, path, contextLines, cwd })`
+查看文件差异。支持 `--staged` 查看已暂存 diff，解析统计信息（新增行、删除行、变更文件数）。
 
-- 解析 Markdown frontmatter
+#### `gitCommit({ message, cwd })`
+提交暂存变更，解析返回 commit hash。
 
-#### `summarizeSkillDescription(body)`
+#### `gitLog({ maxCount, path, branch, cwd })`
+查看提交历史，返回结构化条目（hash、作者、日期、主题）。
 
-- 没有显式 description 时，从正文前几行生成摘要
+#### `gitBranch({ cwd })`
+列出所有本地和远程分支。
 
-#### `tokenize(text)`
+#### `gitCheckout({ branch, target, cwd })`
+切换分支或恢复文件。
 
-- 对请求文本分词
+#### `gitAdd({ files, cwd })`
+暂存指定文件，默认暂存全部。
 
-#### `loadSkills(workspaceRoot)`
+#### `getGitToolList()`
+返回工具列表供 tools.js 注册。
 
-- 从三个来源加载 skills：
-  - `~/.claude/skills`
-  - `<workspace>/.claude/skills`
-  - `<workspace>/.frees-agent/skills`
+### `tools/search-replace.js`
+
+函数：
+
+#### `normalizeText(text)`
+规范化文本中的引号（弯引号转直引号）、空格、换行。
+
+#### `exactSearch(content, oldText)`
+精确搜索 — 直接 indexOf。
+
+#### `normalizedSearch(content, oldText)`
+规范化搜索 — 先规范化再匹配。
+
+#### `contextSearch(content, oldText, contextLines)`
+上下文感知搜索 — 用前后文行辅助定位，解决格式化后精确匹配失败的问题。
+
+#### `lineSearch(content, oldText, startLine)`
+行级别搜索 — 按行号精确匹配。
+
+#### `searchAndReplace({ filePath, oldText, newText, contextLines, startLine, regex, replaceAll })`
+主函数。支持 4 种策略：exact -> context -> line -> normalized，自动降级。支持正则模式和全量替换。
+
+### `tools/mcp-client.js`
+
+类：
+
+#### `McpConnection`
+单个 MCP 服务器连接。
+
+方法：
+- `connect()` — 通过 stdio 传输连接，发送 initialize 请求
+- `disconnect()` — 断开连接，清理 pending 请求
+- `listTools()` — 获取工具列表（带缓存）
+- `callTool(toolName, args)` — 调用工具
+- `isConnected()` — 检查连接状态
+
+内部方法：
+- `_connectStdio()` — 启动子进程，建立 stdio 通信
+- `_handleData(chunk)` — 处理 JSON-RPC 响应行
+- `_sendRaw(request, timeoutMs)` — 发送 JSON-RPC 请求
+
+#### `McpManager`
+多 MCP 服务器管理器。
+
+方法：
+- `getOrConnect(name)` — 获取或创建连接（自动重连）
+- `listAllTools()` — 列出所有 MCP 服务器的工具
+- `callTool(serverName, toolName, args)` — 调用指定服务器的工具
+- `disconnectAll()` — 断开所有连接
+
+#### `buildMcpToolHandlers(mcpManager)`
+构建 MCP 工具处理器。
+- `refreshTools()` — 刷新工具缓存
+- `tryHandleMcpTool(name, args)` — 尝试处理 MCP 工具调用
+- `getToolNames()` — 获取工具名列表
+- `getToolSchemas()` — 获取工具 schema
+
+### `tools/web-fetch.js`
+
+#### `fetchUrl(url, options)`
+获取 URL 内容。支持 HTTP/HTTPS，超时控制（15s），大小限制（512KB），自动检测内容类型。
+
+#### `htmlToBasicText(html)`
+HTML 转纯文本。提取标题、移除脚本/样式、保留链接、解码实体。
+
+### `tools/web-search.js`
+
+#### `searchWebWithTavily(query, config, { maxResults })`
+通过 Tavily API 执行联网搜索。返回摘要和结果列表。
+
+#### `shouldUseWebSearch(message)`
+判断是否需要联网搜索。覆盖中英文生活查询句式。
+
+---
+
+## 13. `src/gui/` 逐文件逐函数分析
+
+### `gui/server.js`
+
+### `createGuiServer({ runtime, messageHandler })`
+创建 Express + WebSocket GUI 服务器。
+
+**安全机制：**
+- 速率限制（rateLimit）— 默认 60 请求/分钟/IP
+- CSP 标头（nonce 注入）
+- 安全 HTTP 标头（X-Content-Type-Options、X-Frame-Options 等）
+
+**REST API 端点：**
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/` | GET | 提供 index.html |
+| `/api/health` | GET | 健康检查 |
+| `/api/status` | GET | 基本状态 |
+| `/api/config` | GET | 安全配置（API Key 脱敏） |
+| `/api/config` | PATCH | 更新配置 |
+| `/api/chat` | POST | REST 聊天回退 |
+| `/api/system` | GET | 系统信息 |
+| `/api/skills` | GET | 技能列表 |
+| `/api/tools` | GET | 工具列表 |
+| `/api/sessions` | GET | 会话列表 |
+| `/api/sessions/:id` | GET | 会话消息 |
+| `/api/files` | GET | 文件树 |
+| `/api/sessions` | POST | 创建会话 |
+| `/api/sessions/:id` | PATCH | 重命名会话 |
+| `/api/sessions/:id` | DELETE | 删除会话 |
+| `/api/memory` | GET | 记忆条目 |
+| `/api/mcp/servers` | GET | MCP 服务器列表 |
+| `/api/mcp/servers` | POST | 添加 MCP 服务器 |
+| `/api/mcp/servers/:name` | DELETE | 删除 MCP 服务器 |
+
+**WebSocket 协议：**
+
+客户端发送：
+- `{ type: 'chat', message, files }` — 发送聊天消息（含附件）
+- `{ type: 'stop' }` — 停止生成
+- `{ type: 'ping' }` — 心跳
+
+服务端推送：
+- `{ type: 'token', data }` — 流式 token
+- `{ type: 'done', data }` — 完成回复
+- `{ type: 'error', message }` — 错误
+- `{ type: 'tool_call', name, args }` — 工具调用通知
+- `{ type: 'tool_result', name, message }` — 工具结果
+- `{ type: 'diffs', diffs }` — 文件变更 diff
+- `{ type: 'memory', memoryCount }` — 记忆更新
+- `{ type: 'files_changed' }` — 文件变更通知
+- `{ type: 'pong' }` — 心跳回复
+
+内部函数：
+- `rateLimit(ip, maxRequests, windowMs)` — 速率限制器
+- `generateNonce()` — CSP nonce 生成
+- `formatBytes(bytes)` — 字节格式化
+- `buildChatMessageWithFiles(data)` — 文件附件嵌入消息
+
+### `gui/file-tree.js`
+
+#### `buildFileTree(files, rootDir)`
+从扁平文件列表构建嵌套树结构。排序规则：目录优先，然后按字母序。
+
+### `gui/public/app.js`
+
+前端 JavaScript，同时支持 Tauri（原生）和浏览器模式。主要功能：
+- WebSocket 连接管理（自动重连）
+- Markdown 渲染（标题、代码块、表格、列表、链接）
+- 消息操作（复制、重新生成、删除）
+- 文件附件上传（base64 编码 + 拖放支持）
+- 桌宠系统（6 个物种、空闲动画、情绪反应）
+- 文件树浏览器（展开/折叠、点击插入路径）
+- 记忆浏览器
+- Diff 查看器（统一 diff 格式，颜色编码）
+- 会话管理（创建/切换/重命名/删除）
+- 搜索（Ctrl+F，消息内容搜索）
+- 设置面板（Provider、Model、Temperature、Stream、Planner）
+- 系统信息面板（CPU、内存、主机信息）
+- MCP 服务器管理（查看/添加/删除）
+- 键盘快捷键（Ctrl+L 新对话、Ctrl+, 设置、Ctrl+Shift+D diff 等）
+
+---
+
+## 14. `src/skills/loader.js` 逐函数分析
+
+函数：
+- `walk(dirPath, files)` — 递归收集 SKILL.md
+- `parseFrontmatter(raw)` — 解析 Markdown frontmatter
+- `loadSkills(workspaceRoot)` — 从三个来源加载 skills：`~/.claude/skills`、`<workspace>/.claude/skills`、`<workspace>/.frees-agent/skills`
+- `selectRelevantSkills(skills, request, limit)` — 关键词匹配请求与 skill
+
+---
+
+## 15. `src/ui/` 逐文件逐函数分析
+
+### `banner.js`
+- `printFreesAgentBanner(runtime, options)` — 品牌横幅
+- `printMiniBanner(text, options)` — 迷你横幅
+
+### `mascot.js`
+- `Mascot` 类 — 桌宠系统
+- `formatUserMessage()` / `formatAssistantMessage()` / `formatError()` / `formatSuccess()` — 消息格式化
+
+### `status-bar.js`
+- `StatusLine` 类 — 状态行
+- `divider()` / `panel()` — UI 组件
+
+### `progress.js`
+- `Spinner` — 旋转指示器
+- `ThinkingIndicator` — 思考状态
+- `ProgressBar` — 进度条
+
+---
+
+## 16. `src/shell/shell-exec.js` 逐函数分析
+
+函数：
+- `validateShellCommand(command)` — 验证命令安全性（7 种危险命令模式拦截）
+- `execShell(command, options)` — 执行 shell 命令
+- `detectShell()` — 检测系统 shell（bash/zsh/cmd/powershell）
+
+安全特性：
+- 自动检测 shell
+- 危险命令模式静态拦截
+- AbortController 超时控制
+- 输出自动截断（1MB 上限）
+- Windows 兼容
+
+---
+
+## 17. `src/utils/` 全部工具函数分析
+
+### `utils/abort.js`
+- `createAbortController(timeoutMs)` — 创建带超时的 AbortController
+
+### `utils/array.js`
+- `ensureArray(value)` — 确保值为数组
+- `dedupeArray(arr)` — 数组去重
+
+### `utils/binary-check.js`
+- `hasBinaryByte(buffer)` — 检查 buffer 是否含二进制字节
+
+### `utils/cli-args.js`
+- `parseCliArgs(argv, spec)` — 解析 CLI 参数
+
+### `utils/combined-abort.js`
+- `combineAbortSignals(...signals)` — 合并多个 AbortSignal
+
+### `utils/diff.js`
+核心 diff 引擎。无外部依赖，基于 LCS 算法。
+
+#### `unifiedDiff(oldText, newText, oldName, newName, contextLines)`
+计算统一 diff。返回 `{ diff, hasChanges, added, removed }`。
 
 算法：
+1. 使用 LCS（最长公共子序列）比较行级差异
+2. 将操作分组成 hunk（带上下文行）
+3. 生成标准 unified diff 格式
 
-- 递归扫描目录
-- 去重
-- 同 slug 去重
-- 返回排序结果
-
-#### `selectRelevantSkills(skills, request, limit)`
-
-- 按关键词匹配请求与 skill
-
-#### `formatSkillContext(skills)`
-
-- 把 skill 内容压缩成 prompt 注入文本
-
-优化方向：
-
-- 前置编译缓存
-- 更强的 frontmatter schema
-- 按 allowed-tools 做真正的约束
-
----
-
-## 13. `src/ui/banner.js` 逐函数分析
-
-职责：
-
-- 输出启动横幅和状态信息
-
-函数：
-
-#### `color(text, code)`
-
-- 只有在 TTY 下才输出 ANSI 颜色
-
-#### `printFreesAgentBanner(runtime, options)`
-
-- 输出品牌横幅
-- 输出 provider/model/mode
-- 输出能力状态和使用提示
-
----
-
-## 14. `src/system/permissions.js` 逐函数分析
-
-职责：
-
-- 生成平台相关的权限说明
-
-函数：
-
-#### `buildPermissionGuide()`
-
-- 按 `process.platform` 返回：
-  - `macOS` 指南
-  - `Windows` 指南
-  - 其他平台通用说明
-
-当前定位：
-
-- 不自动提权
-- 只做引导和文档化
-
----
-
-## 15. `src/utils/` 逐文件逐函数分析
-
-### `utils/http.js`
-
-#### `postJson(url, { headers, body })`
-
-- 统一 POST JSON 请求
-- 对网络失败做友好包装
-- 对 HTTP 非 2xx 做错误提升
-
-### `utils/json.js`
-
-#### `extractFirstJsonObject(text)`
-
-- 从普通文本、代码块、混合输出中抽出第一个合法 JSON 对象
-
-算法：
-
-- 先匹配 fenced code block
-- 再做逐字符大括号深度扫描
-- 兼顾字符串转义状态
-
-#### `truncateForModel(text, limit)`
-
-- 截断长文本，保护 prompt 长度
-
-### `utils/slug.js`
-
-#### `slugify(value, fallback)`
-
-- 生成路径友好的 slug
-
-#### `shortHash(value)`
-
-- 生成短哈希
+### `utils/file-watcher.js`
+#### `createWorkspaceWatcher(index, opts)`
+创建文件变更监视器。使用 `fs.watch` 递归模式（macOS/Linux）或轮询回退。去抖 300ms 合并快速事件。
 
 ### `utils/files.js`
+- `isProbablyTextFile(filePath, buffer)` — 判断文本文件
+- `detectLanguage(filePath)` — 后缀轻量语言识别
+- `readTextIfPossible(filePath)` — 尝试读取文本文件
+- `ensureDir(dirPath)` — 保证目录存在
+- `walkDirectory(rootDir, callback)` — 遍历目录
+- `normalizeRelativePath(filePath)` — 路径统一 `/`
+- `resolveInsideWorkspace(workspaceRoot, targetPath)` — 越界保护
+- `formatBytes(size)` — 友好显示文件大小
 
-职责：
+### `utils/format-time.js`
+- `formatRelativeTime(date)` — 相对时间
+- `formatTimestamp(date)` — 时间戳格式化
 
-- 通用文件与路径工具
+### `utils/format.js`
+- `truncate(str, maxLen)` — 截断字符串
+- `indent(text, level)` — 缩进文本
 
-函数：
+### `utils/git.js`
+- `findGitRoot(cwd)` — 查找 git 仓库根目录
+- `getBranch(cwd)` — 获取当前分支名
+- `getGitState(cwd)` — 综合 git 状态
 
-#### `hasBinaryByte(buffer)`
+### `utils/hash.js`
+- `hashString(str)` — 字符串哈希
 
-- 检查 buffer 是否像二进制文件
+### `utils/http.js`
+- `postJson(url, { headers, body })` — 统一 POST JSON 请求
 
-#### `isProbablyTextFile(filePath, buffer)`
+### `utils/intl.js`
+- `formatNumber(n)` — 数字格式化
+- `formatList(items)` — 列表格式化
 
-- 结合后缀和字节内容判断文本文件
+### `utils/json.js`
+- `extractFirstJsonObject(text)` — 从混合文本中提取首个 JSON
+- `truncateForModel(text, maxLength)` — 截断长文本
 
-#### `detectLanguage(filePath)`
+### `utils/memoize.js`
+- `memoize(fn, options)` — 内联缓存
 
-- 通过后缀名做轻量语言识别
+### `utils/ripgrep.js`
+- `detectRipgrep()` — 检测系统 rg
+- `searchWithRipgrep(pattern, options)` — 正则搜索
 
-#### `readTextIfPossible(filePath)`
+### `utils/sanitize.js`
+- `sanitizePath(input)` — 路径安全处理
+- `sanitizeCommand(input)` — 命令安全处理
 
-- 尝试读取文本文件，二进制返回 null
+### `utils/sequential.js`
+- `runSequentially(tasks)` — 顺序执行异步任务
 
-#### `ensureDir(dirPath)`
+### `utils/set.js`
+- `setDifference(a, b)` — 集合差集
+- `setIntersection(a, b)` — 集合交集
 
-- 保证目录存在
+### `utils/signal.js`
+- `createSignal()` — 创建信号量
 
-#### `writeTextFile(filePath, content)`
+### `utils/sleep.js`
+- `sleep(ms, signal)` — AbortSignal 感知的延迟
 
-- 写 UTF-8 文本文件
+### `utils/slug.js`
+- `slugify(value, fallback)` — 路径友好 slug
+- `shortHash(value)` — 短哈希
+- `generateWordSlug()` — 语义化 slug（形容词-动词-名词）
+- `generateShortWordSlug()` — 短语义化 slug
 
-#### `deleteFile(filePath)`
+### `utils/stream.js`
+- `createTransformStream(transform)` — 转换流
+- `collectStream(stream)` — 收集流内容
 
-- 删除文件
+### `utils/string.js`
+- `capitalize(str)` — 首字母大写
+- `camelCase(str)` — 驼峰命名
+- `kebabCase(str)` — 连字符命名
 
-#### `fileExists(filePath)`
+### `utils/system-info.js`
+- `getSystemInfo()` — 获取系统信息
 
-- 检查文件是否存在
+### `utils/tagged-id.js`
+- `generateTaggedId(tag)` — 生成带标签的 ID
 
-#### `walkDirectory(rootDir, callback)`
+### `utils/tempfile.js`
+- `createTempFile(ext)` — 创建临时文件
+- `createTempDir()` — 创建临时目录
 
-- 遍历目录一层内容
+### `utils/theme.js`
+- `getTheme(name)` — 获取主题
+- `applyTheme(text, key, theme)` — 应用主题
+- 4 主题系统：dark/light/dark-ansi/light-ansi
 
-#### `normalizeRelativePath(filePath)`
+### `utils/timeouts.js`
+- `withTimeout(promise, ms)` — 带超时的 Promise
+- `TimeoutError` — 超时错误类
 
-- 把路径统一成 `/`
+### `utils/tokens.js`
+- `estimateTokens(text)` — 估算 token 数
 
-#### `resolveInsideWorkspace(workspaceRoot, targetPath)`
+### `utils/treeify.js`
+- `treeify(items, options)` — Unicode 树形渲染
 
-- 防止越界访问工作区外文件
+### `utils/truncate.js`
+- `stringWidth(str)` — ANSI 感知字符串宽度
+- `truncateToWidth(text, width)` — 按宽度截断
+- `truncate(str, maxWidth, singleLine)` — 通用截断
 
-这是工作区安全边界的重要函数。
+### `utils/ultraplan/keyword.js`
+- `hasUltraplanKeyword(text)` — 检查是否包含增强规划关键词
 
-#### `formatBytes(size)`
+### `utils/uuid.js`
+- `generateAgentId()` — 生成 Agent ID
+- `isValidUUID(value)` — UUID 校验
 
-- 友好显示文件大小
+### `utils/which.js`
+- `which(name)` — 异步可执行文件查找
+- `whichSync(name)` — 同步版
+
+### `utils/with-resolvers.js`
+- `withResolvers()` — Promise withResolvers polyfill
+
+### `utils/xml.js`
+- `parseXml(text)` — 简易 XML 解析
+- `escapeXml(text)` — XML 转义
 
 ---
 
-## 16. `src/docs/registry.js` 逐函数分析
+## 18. 插件与任务系统
 
-职责：
+### `plugins/registry.js`
+插件注册表，支持外部能力的扩展注册。
 
-- 提供文档注册表
+### `tasks/queue.js`
+任务队列实现，支持异步任务调度。
+
+---
+
+## 19. 文档层
+
+### `docs/registry.js`
 
 常量：
-
-#### `DOCS`
-
-- 当前所有文档的 slug / title / filename 映射表
+- `DOCS` — 文档的 slug / title / filename 映射表
 
 函数：
-
-#### `getDocsRoot()`
-
-- 返回文档目录绝对路径
-
-#### `resolveDocPath(doc)`
-
-- 把 registry 条目转成绝对路径
-
-#### `findDoc(topic)`
-
-- 根据 slug / 文件名 / 标题模糊查找文档
+- `getDocsRoot()` — 返回文档目录绝对路径
+- `resolveDocPath(doc)` — 路径解析
+- `findDoc(topic)` — 模糊查找文档
 
 ---
 
-## 17. 文档文件逐个用途说明
+## 20. 当前核心算法剖析
 
-这些文件本身没有函数，但它们构成了 Frees Agent 的知识层：
+### 20.1 文件相关性算法
+`workspace/indexer.js -> findRelevantFiles`
+- 用户请求分词 -> 路径命中高分 -> 内容命中低分 -> 排序取前 N
+- 优点：快、无外部依赖
+- 缺点：语义能力弱
 
-- `docs/README.md`
-  文档目录索引
-- `01-*`
-  LLM 与 Agent 基础
-- `02-*`
-  训练自己的模型
-- `03-*`
-  LM Studio 二次训练问题
-- `04-*`
-  训练质量最佳实践
-- `05-*`
-  训练常见问题排查
-- `06-*`
-  模型加载和 API 接入
-- `07-*`
-  记忆与超长对话
-- `08-*`
-  数据集构建和评测
-- `09-*`
-  模型产品化路线
-- `10-*`
-  权限与电脑控制边界
-- `11-*`
-  手把手接模型
-- `12-*`
-  扩展开发指南
-- `13-*`
-  项目架构说明
-- `14-*`
-  Skill 文件支持说明
+### 20.2 长对话压缩算法
+`memory/manager.js -> compactConversationIfNeeded`
+- 保留最近 N 条 -> 更早消息做摘要 -> 失败 fallback 为文本拼接
+- 优点：成本低、容错强
+- 缺点：摘要质量依赖模型
 
----
+### 20.3 记忆提取算法
+`memory/heuristics.js + memory/manager.js`
+- 本地规则优先 -> 模型提取补充
+- 优点：可确定信息更稳定
+- 缺点：规则还比较少
 
-## 18. 测试文件分析
-
-### `test/agent-cli.test.js`
-
-职责：
-
-- 为关键能力提供回归测试
-
-当前测试覆盖：
-
-- JSON 提取
-- 工作区扫描
-- Agent 编辑循环
-- 记忆持久化
-- 会话摘要压缩
-- 记忆上下文注入
-- 权限指南
-- 本地名字记忆快捷回答
-- skill 加载与匹配
-
-不足：
-
-- 还没有 provider 真实集成测试
-- 还没有 CLI 子命令层端到端测试
-
----
-
-## 19. 当前核心算法剖析
-
-### 19.1 文件相关性算法
-
-位置：
-
-- `workspace/indexer.js -> findRelevantFiles`
-
-算法本质：
-
-- 用户请求分词
-- 路径命中高分
-- 内容命中低分
-- 按分数排序取前 N
-
-优点：
-
-- 快
-- 无外部依赖
-- 对代码库初步定位有效
-
-缺点：
-
-- 语义能力弱
-- 容易漏掉“关键词不重合但语义相关”的文件
-
-### 19.2 长对话压缩算法
-
-位置：
-
-- `memory/manager.js -> compactConversationIfNeeded`
-
-算法本质：
-
-- 保留最近 `keepRecentMessages`
-- 把更早消息送去总结
-- 总结失败时 fallback 为简化文本拼接
-
-优点：
-
-- 成本低
-- 容错强
-
-缺点：
-
-- 摘要质量依赖模型
-- 还没有层级摘要树
-
-### 19.3 记忆提取算法
-
-位置：
-
-- `memory/heuristics.js`
-- `memory/manager.js`
-
-算法本质：
-
-- 本地规则优先
-- 模型提取补充
-
-优点：
-
-- 可确定信息更稳定
-- 不完全依赖模型发挥
-
-缺点：
-
-- 规则还比较少
-- 复杂用户画像还不够细
-
-### 19.4 Skill 匹配算法
-
-位置：
-
-- `skills/loader.js -> selectRelevantSkills`
-
-算法本质：
-
+### 20.4 Skill 匹配算法
+`skills/loader.js -> selectRelevantSkills`
 - skill 名/slug/description/body 的关键词匹配
+- 优点：简单透明
+- 缺点：没有语义检索
 
-优点：
+### 20.5 向量嵌入算法
+`memory/vector.js -> embedText`
+- CJK 感知分词 + n-gram -> FNV-1a 哈希 -> 256 维向量 -> L2 归一化
+- 优点：无外部依赖、速度快
+- 缺点：无语义理解、碰撞率高
 
-- 简单透明
-- 易于调试
+### 20.6 Diff 算法
+`utils/diff.js -> unifiedDiff`
+- LCS（最长公共子序列）行级比较 -> hunk 分组 -> unified diff 格式
+- 优点：无外部依赖、结果标准
 
-缺点：
+### 20.7 上下文感知搜索替换
+`tools/search-replace.js -> searchAndReplace`
+- 4 策略降级：exact -> context -> line -> normalized
+- 优点：健壮、解决格式化破坏匹配
 
-- 没有语义检索
-- 没有工具权限强约束
+### 20.8 工具编排算法
+`agent/orchestration.js -> partitionTools`
+- 只读工具并行执行（并发 5）+ 写入工具串行执行
+- 优点：效率高、保持写入顺序
 
 ---
 
-## 20. 当前架构优点
+## 21. 当前架构优点
 
 - 本地优先，配置和记忆落盘清晰
-- 模块边界比早期原型清楚
+- 模块边界清晰
 - provider 抽象简单直接
 - 支持工作区、记忆、skills 三种上下文源
-- 测试覆盖了关键中枢能力
+- 工具循环支持并行只读 + 串行写入
+- GUI 两阶段启动（即时响应 + 后台初始化）
+- 原生 Git 工具绕过 bash 安全限制
+- 上下文感知搜索替换解决格式化问题
+- 测试覆盖关键中枢能力
 - 文档体系已经形成
 
 ---
 
-## 21. 当前主要不足
+## 22. 当前主要不足
 
-- `src/cli.js` 仍然偏长，命令定义还可以抽象
+- `src/cli.js` 仍然偏长
 - `chat.js` 依然承担太多编排职责
 - 工作区相关性检索仍然是关键词级
-- skill 还没有真正的权限执行模型
-- provider 还没有流式输出
+- 向量检索无语义理解
 - 没有统一日志与调试层
 - 没有端到端命令测试
+- GUI 功能不全（文件树已实现，diff 已实现，但附件后端已连接、设置面板仍有限）
+- 无多模态输入（图片分析等）
+- 无交互式终端
+- Tauri CSP 禁用
 
 ---
 
-## 22. 后续优化方向
+## 23. 后续优化方向
 
 ### 第一优先级
-
-- 把命令注册抽成统一 registry
-- 把 chat 编排逻辑拆成 session service
-- provider 增加流式输出
-- 给 doctor 增加更详细的连通性诊断
+- 命令注册抽成统一 registry
+- provider 增加更完善的流式输出
+- 增加更详细的连通性诊断
 
 ### 第二优先级
-
 - 引入语义检索或 embedding 检索
 - 增强记忆重要度评分与过期策略
 - skill 增加强约束和更多元数据
-- 加项目级记忆与全局记忆分层
 
 ### 第三优先级
-
 - 引入 RAG
-- 引入多 agent 协作
+- 引入多 Agent 协作
 - 引入 IDE 集成
-- 引入补丁预览与交互确认
+- 补丁预览与交互确认
 
 ### 第四优先级
-
 - 真正电脑控制层
 - 权限模型和审计日志
 - 插件化 provider / skill / tool 系统
-
----
-
-## 23. 推荐的下一步重构路线
-
-### 路线 A：可维护性优先
-
-1. 拆分 `chat.js`
-2. 拆分 `cli.js`
-3. 建立命令注册表
-4. 建立统一类型定义层
-
-### 路线 B：能力增强优先
-
-1. provider 流式输出
-2. 更强检索
-3. 更强记忆
-4. 更强 skill
-
-### 路线 C：产品化优先
-
-1. 更强首页与状态栏
-2. 更好错误提示
-3. 新手引导
-4. 权限管理
+- 多媒体处理（图片/视频/音频）
+- 多模态模型支持
 
 ---
 
 ## 24. 一句总结
 
-`Frees Agent` 当前已经不是一个简单 demo，它已经具备了：
-
-- 命令层
-- 模型层
-- 工作区层
-- 记忆层
-- 技能层
-- 文档层
-
-这套工程的下一阶段重点，不再是“有没有功能”，而是：
-
-- 把功能继续模块化
-- 把算法继续做强
-- 把项目继续做成长期可维护的产品工程
+`Frees Agent` 当前已经是一个具有 CLI 命令层、模型层、工作区层、记忆层、技能层、工具层、GUI 层、文档层的完整工程。下一阶段重点是把功能继续模块化、把算法继续做强、把项目继续做成长期可维护的产品工程。

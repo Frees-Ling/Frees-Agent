@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import path from 'node:path';
 import { createAbortController } from '../utils/abort.js';
 import { getDefaultBashTimeoutMs, getMaxBashTimeoutMs } from '../utils/timeouts.js';
 
@@ -76,13 +77,17 @@ export function detectShell() {
 
   const isWin = process.platform === 'win32';
 
+  // macOS default shell (Catalina+) is zsh; fallback to bash
+  const unixDefaultShell = process.platform === 'darwin' ? '/bin/zsh' : '/bin/bash';
+  const shellPath = process.env.SHELL || unixDefaultShell;
+
   _detectedShell = {
     isWindows: isWin,
-    shell: isWin ? (process.env.COMSPEC || 'cmd.exe') : (process.env.SHELL || '/bin/bash'),
+    shell: isWin ? (process.env.COMSPEC || 'cmd.exe') : shellPath,
     shellArgs: isWin ? ['/d', '/s', '/c'] : ['-c'],
     type: isWin
       ? (process.env.SHELL?.includes('powershell') ? 'powershell' : 'cmd')
-      : (process.env.SHELL?.includes('zsh') ? 'zsh' : 'bash'),
+      : path.basename(shellPath).replace(/^-/, ''),
   };
 
   return _detectedShell;

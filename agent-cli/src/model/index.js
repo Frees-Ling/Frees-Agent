@@ -4,7 +4,7 @@ import { OllamaClient } from './ollama.js';
 import { OpenAICompatibleClient } from './openai-compatible.js';
 
 const PROVIDER_PRIORITY = ['ollama', 'openai-compatible', 'mcp', 'anthropic'];
-const PROVIDER_PROBE_TIMEOUT_MS = 12000;
+const PROVIDER_PROBE_TIMEOUT_MS = 5000;
 
 function getApiKey({ apiKey, apiKeyEnv, configKeyEnv }) {
   if (apiKey) {
@@ -181,8 +181,18 @@ export async function createModelClient(options = {}) {
   }
 
   const providerQueue = resolveFallbackProviders(runtime.config, runtime.providerName);
+
+  // Filter out providers that clearly cannot work (no api key configured)
   const probeTasks = await Promise.all(
-    providerQueue.map(async providerName => {
+    providerQueue.filter((name) => {
+      const cfg = runtime.config.providers?.[name];
+      if (!cfg) return true; // try it anyway
+      // Skip anthropic if no api key available
+      if (name === 'anthropic' && !getApiKey({ apiKeyEnv: cfg.apiKey, configKeyEnv: cfg.apiKeyEnv })) {
+        return false;
+      }
+      return true;
+    }).map(async providerName => {
       const providerRuntime = await resolveModelRuntime({
         ...options,
         provider: providerName

@@ -51,18 +51,18 @@ export async function runEditCommand(options) {
     mcpManager: mcpServerNames.length ? mcpManager : null
   });
 
-  console.log('\nSummary:');
-  console.log(result.summary || 'No summary');
+  console.log('\n总结:');
+  console.log(result.summary || '无总结');
 
   if (result.changedFiles?.length) {
-    console.log('\nChanged files:');
+    console.log('\n修改的文件:');
     for (const file of new Set(result.changedFiles)) {
       console.log(`- ${file}`);
     }
   }
 
   if (result.notes?.length) {
-    console.log('\nNotes:');
+    console.log('\n备注:');
     for (const note of result.notes) {
       console.log(`- ${note}`);
     }

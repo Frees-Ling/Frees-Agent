@@ -10,6 +10,7 @@ import {
   buildChatSystemPrompt,
   compactConversationIfNeeded,
   describeMemoryState,
+  initializeMemorySystem,
   updateMemoryAfterTurn
 } from '../memory/manager.js';
 import { resolveLocalChatShortcut } from '../memory/heuristics.js';
@@ -137,6 +138,9 @@ export async function runChatCommand(options) {
     sessionName: options.session || runtime.config.conversation?.defaultSessionName
   });
   const memoryState = await loadMemoryState(memoryStore, runtime.config);
+
+  // 初始化向量嵌入服务（真实嵌入或 FNV-1a 回退）
+  await initializeMemorySystem(runtime.config);
 
   let plannerClient = null;
   let criticClient = null;

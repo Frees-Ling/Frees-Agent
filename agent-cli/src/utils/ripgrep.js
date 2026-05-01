@@ -71,7 +71,7 @@ export async function ripGrep(args, target, abortSignal) {
         }
 
         if (isTimeout && lines.length === 0) {
-          reject(new RipgrepTimeoutError('Ripgrep search timed out. Try a more specific path or pattern.', lines));
+          reject(new RipgrepTimeoutError('Ripgrep 搜索超时，请尝试指定更具体的路径或模式。', lines));
           return;
         }
         resolve(lines);

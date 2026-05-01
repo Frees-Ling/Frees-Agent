@@ -29,13 +29,20 @@ class McpConnection {
     const args = this.config.args || [];
     const env = { ...process.env, ...(this.config.env || {}) };
 
+    // Determine if shell is needed: Windows always, or if command is a shell-builtin/script
+    const needsShell = process.platform === 'win32' || (
+      typeof command === 'string' && (
+        !command.includes(path.sep) && !command.startsWith('.')
+      )
+    );
+
     return new Promise((resolve, reject) => {
       let resolved = false;
       try {
         const child = spawn(command, args, {
           env,
           stdio: ['pipe', 'pipe', 'pipe'],
-          shell: process.platform === 'win32'
+          shell: needsShell
         });
         this.process = child;
       } catch (error) {

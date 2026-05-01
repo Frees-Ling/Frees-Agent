@@ -40,16 +40,22 @@ pub async fn execute_shell(options: ShellExecOptions) -> Result<ShellResult, Str
         cmd.current_dir(cwd);
     }
 
-    // Security: block dangerous commands
+    // Security: block dangerous commands (cross-platform safe)
     let lower = options.command.to_lowercase();
     let dangerous = [
-        "rm -rf /", "rm -rf ~", "mkfs.", "dd if=", ":(){ :|:& };:", "wget ",
-        "curl ", "sudo ", "chmod 777 ", "> /dev/sda",
+        "rm -rf /", "rm -rf ~", "mkfs.", "dd if=", ":(){ :|:& };:",
+        "sudo rm -rf", "chmod 777 /", "> /dev/sda", "> /dev/nvme",
+        "mkfs.ext4", "mkfs.fat", "format ",
     ];
     for &pattern in &dangerous {
         if lower.contains(pattern) {
             return Err(format!("命令被安全策略拦截（危险模式）: {}", pattern));
         }
+    }
+
+    // Block curl/wget only when used in pipes (data exfiltration prevention)
+    if lower.contains("| curl ") || lower.contains("| wget ") || lower.contains("| nc ") {
+        return Err("命令被安全策略拦截：不允许在管道中使用 curl/wget/nc（防止数据泄露）".into());
     }
 
     let output = if let Some(timeout) = options.timeout_ms {

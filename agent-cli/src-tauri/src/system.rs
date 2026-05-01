@@ -53,10 +53,11 @@ pub fn get_system_info() -> SystemInfo {
         (r + n.total_received(), t + n.total_transmitted())
     });
 
-    // hostname via std
-    let hostname = std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| "unknown".into());
+    // hostname: use sysinfo hostname (cross-platform), fall back to env vars
+    let hostname = System::host_name()
+        .or_else(|| std::env::var("HOSTNAME").ok())
+        .or_else(|| std::env::var("COMPUTERNAME").ok())
+        .unwrap_or_else(|| "unknown".into());
 
     SystemInfo {
         timestamp: now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),

@@ -9,16 +9,13 @@ import {
 } from '../utils/files.js';
 
 const DEFAULT_IGNORE_NAMES = new Set([
-  '.git',
-  'node_modules',
-  'dist',
-  'build',
-  'coverage',
-  '.next',
-  '.nuxt',
-  '.turbo',
-  '.idea',
-  '.vscode'
+  '.git', 'node_modules', 'dist', 'build', 'coverage',
+  '.next', '.nuxt', '.turbo', '.idea', '.vscode',
+  '.cache', '__pycache__', '.venv', 'venv', '.env',
+  'vendor', 'bower_components', 'Pods',
+  'DerivedData', '.build', 'target',
+  '.swc', '.yarn', '.pnp', '.pnp.js',
+  '.DS_Store', 'Thumbs.db',
 ]);
 
 export async function scanWorkspace(workspaceRoot, config = {}) {

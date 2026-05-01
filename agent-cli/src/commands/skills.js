@@ -25,7 +25,7 @@ export async function runSkillsCommand(options) {
     return;
   }
 
-  console.log(`workspace: ${workspaceRoot}`);
+  console.log(`工作区: ${workspaceRoot}`);
   for (const skill of skills) {
     console.log(`- ${skill.slug}: ${skill.description}`);
   }

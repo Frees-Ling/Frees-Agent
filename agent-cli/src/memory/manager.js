@@ -12,7 +12,8 @@ import {
   autoNameSession,
   listAllSessionFiles
 } from './store.js';
-import { queryVectorMemories, upsertDurableMemoriesToVectorIndex } from './vector.js';
+import { queryVectorMemories, upsertDurableMemoriesToVectorIndex, getHotMemories, ageMemories } from './vector.js';
+import { initializeEmbeddings, getEmbeddingService } from './embeddings.js';
 import { injectSystemClock } from '../utils/system-info.js';
 import {
   buildMemoryContext,
@@ -53,6 +54,17 @@ export function buildChatSystemPrompt({ baseSystemPrompt, state, config }) {
   if (!memoryContext) return injectSystemClock(baseSystemPrompt);
 
   return injectSystemClock(`${baseSystemPrompt}\n${memoryContext}`.trim());
+}
+
+/**
+ * Initialize the memory system: embedding service, hot memory cache, etc.
+ * Called once at startup after config is loaded.
+ */
+export async function initializeMemorySystem(config) {
+  const embeds = config?.memory?.embeddings;
+  if (embeds?.enabled !== false) {
+    await initializeEmbeddings(config);
+  }
 }
 
 export async function updateMemoryAfterTurn({
@@ -122,15 +134,40 @@ export async function attachSemanticMemoriesToState({ state, query, config }) {
     state.semanticMemories = [];
     return;
   }
-  if (!query || !state.durableMemories.length) {
+  if (!query) {
     state.semanticMemories = [];
     return;
   }
-  state.semanticMemories = await queryVectorMemories(
-    state.store.vectorMemoryPath,
-    query,
-    config?.memory?.vectorMemory?.topK ?? 6
-  );
+
+  const topK = config?.memory?.vectorMemory?.topK ?? 6;
+
+  // Get hot-tier memories (high importance, always relevant)
+  let hotMemories = [];
+  try {
+    hotMemories = await getHotMemories(state.store.vectorMemoryPath);
+  } catch { /* skip if not available */ }
+
+  // Get warm-tier memories via semantic similarity
+  let warmMemories = [];
+  if (state.durableMemories.length > 0) {
+    warmMemories = await queryVectorMemories(
+      state.store.vectorMemoryPath,
+      query,
+      topK
+    );
+  }
+
+  // Merge and deduplicate: hot memories come first
+  const seen = new Set(hotMemories.map(m => m.id));
+  const merged = [...hotMemories];
+  for (const m of warmMemories) {
+    if (!seen.has(m.id)) {
+      merged.push(m);
+      seen.add(m.id);
+    }
+  }
+
+  state.semanticMemories = merged.slice(0, topK + hotMemories.length);
 }
 
 export async function compactConversationIfNeeded({ client, state, config, temperature = 0.1 }) {

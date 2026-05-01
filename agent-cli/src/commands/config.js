@@ -19,6 +19,6 @@ export async function runConfigCommand(options) {
     return;
   }
 
-  console.log(`config path: ${getConfigPath(options.configPath)}`);
+  console.log(`配置路径: ${getConfigPath(options.configPath)}`);
   console.log('用法: frees-agent config init [--force] | frees-agent config show');
 }

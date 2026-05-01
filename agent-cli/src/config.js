@@ -39,7 +39,7 @@ const DEFAULT_CONFIG = {
       command: 'npx',
       args: ['@tavily/mcp'],
       env: {
-        TAVILY_API_KEY: 'YOUR_TAVILY_API_KEY'
+        TAVILY_API_KEY: 'vly-dev-2eeZkg-uvzDyDhZb41ffLx5YQitQYJ1gfLsq4WU4BxfJ9aQxk'
       },
       baseUrl: 'http://127.0.0.1:1234/v1'
     }
@@ -93,6 +93,11 @@ const DEFAULT_CONFIG = {
     vectorMemory: {
       enabled: true,
       topK: 6
+    },
+    embeddings: {
+      enabled: true,
+      provider: 'fnv',
+      cacheSize: 500
     }
   },
   conversation: {
@@ -170,6 +175,26 @@ export function getDefaultConfigPath() {
   if (homeOverride) {
     return path.join(path.resolve(homeOverride), 'config.json');
   }
+  // XDG_CONFIG_HOME on Linux/macOS
+  const xdgConfig = process.env.XDG_CONFIG_HOME;
+  if (xdgConfig) {
+    return path.join(xdgConfig, 'frees-agent', 'config.json');
+  }
+  // macOS: ~/Library/Application Support
+  if (process.platform === 'darwin') {
+    const home = process.env.HOME;
+    if (home) {
+      return path.join(home, 'Library', 'Application Support', 'frees-agent', 'config.json');
+    }
+  }
+  // Windows: %APPDATA%
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA;
+    if (appData) {
+      return path.join(appData, 'frees-agent', 'config.json');
+    }
+  }
+  // Fallback: project-local .frees-agent
   return path.resolve(process.cwd(), '.frees-agent', 'config.json');
 }
 
@@ -222,7 +247,22 @@ export function getDefaultConfigPathForProfile(profileName = 'default') {
   if (homeOverride) {
     return path.join(path.resolve(homeOverride), `${profileName}.json`);
   }
-  const configDir = path.resolve(process.cwd(), '.frees-agent');
+  // Determine config directory based on platform
+  let configDir;
+  const xdgConfig = process.env.XDG_CONFIG_HOME;
+  if (xdgConfig) {
+    configDir = path.join(xdgConfig, 'frees-agent');
+  } else if (process.platform === 'darwin') {
+    configDir = process.env.HOME
+      ? path.join(process.env.HOME, 'Library', 'Application Support', 'frees-agent')
+      : path.resolve(process.cwd(), '.frees-agent');
+  } else if (process.platform === 'win32') {
+    configDir = process.env.APPDATA
+      ? path.join(process.env.APPDATA, 'frees-agent')
+      : path.resolve(process.cwd(), '.frees-agent');
+  } else {
+    configDir = path.resolve(process.cwd(), '.frees-agent');
+  }
   if (profileName === 'default') {
     return path.join(configDir, 'config.json');
   }
@@ -303,5 +343,16 @@ export function getFreesAgentVersion() {
 }
 
 export function getFreesAgentHome() {
-  return process.env.FREES_AGENT_HOME || path.resolve(process.cwd(), '.frees-agent');
+  if (process.env.FREES_AGENT_HOME) return path.resolve(process.env.FREES_AGENT_HOME);
+  const xdgConfig = process.env.XDG_CONFIG_HOME;
+  if (xdgConfig) return path.join(xdgConfig, 'frees-agent');
+  if (process.platform === 'darwin') {
+    const home = process.env.HOME;
+    if (home) return path.join(home, 'Library', 'Application Support', 'frees-agent');
+  }
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA;
+    if (appData) return path.join(appData, 'frees-agent');
+  }
+  return path.resolve(process.cwd(), '.frees-agent');
 }

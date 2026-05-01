@@ -16,9 +16,12 @@
     "test": "node --test test/agent-cli.test.js",
     "build:bundle": "mkdir dist && npx esbuild ./src/cli.js --bundle --platform=node --target=node20 --outfile=dist/frees-agent.js && npx cpy \"docs/**/*\" dist/docs",
     "build:exe": "npx pkg . --targets node18-win-x64 --output release/frees-agent.exe",
+    "build:mac-x64": "npx pkg . --targets node18-macos-x64 --output release/frees-agent-macos-x64",
+    "build:mac-arm64": "npx pkg . --targets node18-macos-arm64 --output release/frees-agent-macos-arm64",
+    "build:all": "npm run build:bundle && npm run build:exe && npm run build:mac-x64 && npm run build:mac-arm64",
     "build:tauri": "cd src-tauri && cargo build --release 2>&1 | tail -3",
     "gui": "npm run build:tauri && echo '✓ Tauri 桌面应用已构建: src-tauri/target/release/frees-agent.exe'",
-    "build": "npm run build:bundle && npm run build:exe"
+    "build": "npm run build:bundle && npm run build:exe && npm run build:mac-x64 && npm run build:mac-arm64"
   },
   "pkg": {
     "scripts": [
@@ -28,7 +31,9 @@
       "docs/**/*"
     ],
     "targets": [
-      "node18-win-x64"
+      "node18-win-x64",
+      "node18-macos-x64",
+      "node18-macos-arm64"
     ]
   },
   "devDependencies": {
